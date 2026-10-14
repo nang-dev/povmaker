@@ -29,7 +29,7 @@ window.SITE_CONFIG = {
     ranthesim: {
       title: "Ran The Sim",
       tagline: "What if…? We ran the sim.",
-      sub: "Real numbers. Simulated worlds. New sims every week.",
+      sub: "Real numbers. Simulated worlds. New sims every day.",
       cta: "Make videos like this → POVMaker",
       socials: [
         // { label: "TikTok", url: "https://www.tiktok.com/@ranthesim" },
