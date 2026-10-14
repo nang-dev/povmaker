@@ -16,17 +16,17 @@ const num = (v, d) => { const n = Number(String(v).replace(/[, _]/g, "")); retur
 const fmt = (n) => Math.round(n).toLocaleString("en-US");
 const clock = (t) => `T+${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 // Sim-time clock: the counter's progress divided by the stated rate, so the HUD clock and the premise never disagree.
-function simClock(s) {
+function simClock(s, yrs) {
   s = Math.max(0, Math.round(s));
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
-  if (d >= 3650) return `T+${(s / 31557600).toFixed(s / 31557600 < 100 ? 1 : 0)} YR`;   // 10+ years: keeps the HUD tag row legible
+  if (d >= 3650 || (yrs && d >= 365)) return `T+${(s / 31557600).toFixed(s / 31557600 < 100 ? 1 : 0)} YR`;   // 10+ years: keeps the HUD tag row legible
   if (d >= 1000) return `T+${d.toLocaleString("en-US")} D`;
   if (d) return `T+${d}D ${String(h).padStart(2, "0")}H ${String(m).padStart(2, "0")}M`;
   if (h) return `T+${h}H ${String(m).padStart(2, "0")}M`;
   return clock(s);
 }
 function simSpan(s) { // "7 H", "3 M", "2 D", "11 Y": the nearest whole unit
-  const u = s >= 31557600 * 1.5 ? [31557600, "Y"] : s >= 86400 * 1.5 ? [86400, "D"] : s >= 3600 * 1.5 ? [3600, "H"] : s >= 90 ? [60, "M"] : [1, "S"];
+  const u = s >= 31557600 * 0.95 ? [31557600, "Y"] : s >= 86400 * 1.5 ? [86400, "D"] : s >= 3600 * 1.5 ? [3600, "H"] : s >= 90 ? [60, "M"] : [1, "S"];
   const v = Math.max(1, Math.round(s / u[0]));
   return `${v} ${u[1]}`;
 }
@@ -140,6 +140,16 @@ function simHero(ctx, t, w, hot, cam) {
   return [ox, oy];
 }
 const TAIL = 1.5; // contact hold: counter red + flash before the end card
+const tailOf = (p) => clamp(num(p.tail, TAIL), 0.5, 4);   // hidden preset param: a longer hold for a caption that has to be read
+// Caption plan. "text @5.5" pins a beat to 5.5 s (every line must carry it); otherwise the beats are spaced evenly after the hold.
+function stagePlan(p, D) {
+  const raw = rows(p.stages), tEnd = D - tailOf(p);
+  const m = raw.map((l) => /^(.*\S)\s*@\s*(\d+(?:\.\d+)?)\s*$/.exec(l));
+  const texts = raw.map((l, i) => (m[i] ? m[i][1] : l)), n = Math.max(1, texts.length);
+  const starts = raw.length && m.every(Boolean) ? m.map((x) => clamp(Number(x[2]), HOLD, tEnd))
+    : Array.from({ length: n }, (_, i) => HOLD + (i * (tEnd - HOLD)) / n);
+  return { texts, starts, n, tEnd };
+}
 // ---- per-preset heroes for the 2D sim (Muse presets review): `hero` = sun | dots | atmosphere (default = the orbit-into-Earth) ----
 // All are pure functions of the counter, drawn in the 650-1250 hero band under the same camera push (cam).
 function heroSun(ctx, t, w, hot, cam) { // "commute": you fly in to a big amber Sun that swells as the distance drops; the counter is the distance to it
@@ -194,19 +204,129 @@ function heroAtmos(ctx, t, frac, hot, cam) { // "oxygen": Earth with a halo that
   ctx.fillStyle = e; ctx.beginPath(); ctx.arc(cx, cy, 150, 0, 7); ctx.fill();
   ctx.restore();
 }
+const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+function heroSeasons(ctx, t, age, cam) { // "life": a window onto a tree that runs a full year of seasons per counter year; the room changes with the age
+  const cx = 540, cy = 960, ph = ((age % 1) + 1) % 1, A = Math.floor(age + 1e-9);
+  const KEY = [ // spring, summer, autumn, winter (centred on phase 0, .25, .5, .75)
+    { sky: ["#86B6DA", "#D3E6F0"], leaf: "#8FD18A", la: 0.9, ground: "#5E8F4E" },
+    { sky: ["#4F9FD6", "#BFE0F2"], leaf: "#3FA34D", la: 1, ground: "#3E7F3A" },
+    { sky: ["#8C93A8", "#E0BE9C"], leaf: "#E39A3B", la: 0.92, ground: "#8A6B3A" },
+    { sky: ["#69758A", "#CBD4DD"], leaf: "#C8D0D8", la: 0, ground: "#E6ECF1" }];
+  const W4 = KEY.map((_, i) => { let d = Math.abs(ph - i / 4); d = Math.min(d, 1 - d); return Math.max(0, 1 - 4 * d); });
+  const sum = W4.reduce((a, b) => a + b, 0), wt = W4.map((x) => x / sum);
+  const col = (k) => { const c = [0, 0, 0]; KEY.forEach((K, i) => { const r = hexRgb(typeof K[k] === "string" ? K[k] : K[k][0]); for (let j = 0; j < 3; j++) c[j] += r[j] * wt[i]; }); return `rgb(${c.map(Math.round).join(",")})`; };
+  const sky1 = col("sky"), leaf = col("leaf"), ground = col("ground");
+  const skyB = (() => { const c = [0, 0, 0]; KEY.forEach((K, i) => { const r = hexRgb(K.sky[1]); for (let j = 0; j < 3; j++) c[j] += r[j] * wt[i]; }); return `rgb(${c.map(Math.round).join(",")})`; })();
+  const leafA = KEY.reduce((a, K, i) => a + K.la * wt[i], 0);
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(cam, cam); ctx.translate(-cx, -cy);
+  // wall + floor
+  ctx.fillStyle = "#2C3645"; ctx.fillRect(64, 650, 952, 430);
+  ctx.fillStyle = "#493B35"; ctx.fillRect(64, 1080, 952, 160);
+  ctx.fillStyle = "#364152"; ctx.fillRect(64, 1070, 952, 10);
+  ctx.fillStyle = "#5C7085"; ctx.beginPath(); ctx.ellipse(540, 1180, 360, 44, 0, 0, 7); ctx.fill();   // rug
+  // window: the tree outside
+  const wx = 190, wy = 690, ww = 700, wh = 340;
+  ctx.save(); ctx.beginPath(); ctx.rect(wx, wy, ww, wh); ctx.clip();
+  const sg = ctx.createLinearGradient(0, wy, 0, wy + wh); sg.addColorStop(0, sky1); sg.addColorStop(1, skyB);
+  ctx.fillStyle = sg; ctx.fillRect(wx, wy, ww, wh);
+  ctx.fillStyle = ground; ctx.fillRect(wx, wy + 250, ww, 90);
+  const tx = 540, by = wy + 262;
+  ctx.fillStyle = "#4A3A2E"; ctx.fillRect(tx - 17, by - 150, 34, 160);
+  ctx.strokeStyle = "#4A3A2E"; ctx.lineWidth = 12; ctx.lineCap = "round";
+  for (const [x2, y2] of [[-90, -210], [90, -215], [-50, -240], [55, -245], [0, -265]]) { ctx.beginPath(); ctx.moveTo(tx, by - 120); ctx.lineTo(tx + x2, by + y2 + 60); ctx.stroke(); }
+  if (leafA > 0.02) {
+    ctx.globalAlpha = leafA; ctx.fillStyle = leaf;
+    for (const [dx, dy, r] of [[0, -190, 92], [-78, -150, 70], [78, -150, 70], [0, -250, 62], [-44, -215, 64], [44, -215, 64]]) { ctx.beginPath(); ctx.arc(tx + dx, by + dy, r, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
+  if (wt[0] > 0.05) { ctx.fillStyle = `rgba(255,190,214,${(0.9 * wt[0]).toFixed(2)})`; for (let i = 0; i < 12; i++) { const a = i * 2.39; ctx.beginPath(); ctx.arc(tx + Math.cos(a) * (30 + (i % 4) * 22), by - 190 + Math.sin(a) * (24 + (i % 3) * 26), 7, 0, 7); ctx.fill(); } }
+  if (wt[2] > 0.05) { ctx.fillStyle = `rgba(227,154,59,${wt[2].toFixed(2)})`; for (let i = 0; i < 9; i++) { const f = ((t * 0.5 + i * 0.11) % 1); ctx.beginPath(); ctx.ellipse(tx - 160 + i * 38 + Math.sin(f * 9 + i) * 14, wy + 40 + f * 280, 9, 5, f * 6 + i, 0, 7); ctx.fill(); } }
+  if (wt[3] > 0.05) { ctx.fillStyle = `rgba(255,255,255,${(0.95 * wt[3]).toFixed(2)})`; for (let i = 0; i < 14; i++) { const f = ((t * 0.7 + i * 0.073) % 1); ctx.beginPath(); ctx.arc(wx + 30 + i * 49 + Math.sin(f * 7 + i) * 10, wy + f * wh, 4, 0, 7); ctx.fill(); } }
+  ctx.restore();
+  ctx.strokeStyle = "#151B24"; ctx.lineWidth = 16; ctx.strokeRect(wx, wy, ww, wh);
+  ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(wx + ww / 2, wy); ctx.lineTo(wx + ww / 2, wy + wh); ctx.moveTo(wx, wy + wh / 2); ctx.lineTo(wx + ww, wy + wh / 2); ctx.stroke();
+  // the room changes with you: crib -> bed + school desk -> bed + laptop desk
+  const bed = (x) => { ctx.fillStyle = "#6B5646"; rrect(ctx, x, 1118, 300, 96, 10); ctx.fill(); ctx.fillStyle = "#3DD6F5"; ctx.globalAlpha = 0.35; rrect(ctx, x + 14, 1128, 272, 52, 8); ctx.fill(); ctx.globalAlpha = 1; };
+  if (A >= 10) { ctx.fillStyle = "#3A475A"; ctx.fillRect(110, 760, 56, 78); ctx.fillStyle = P.amber; ctx.fillRect(122, 774, 32, 22); }   // a poster goes up at ten
+  if (A < 4) {
+    ctx.strokeStyle = "#B08A5E"; ctx.lineWidth = 8; ctx.strokeRect(300, 1100, 280, 112);
+    ctx.lineWidth = 5; for (let i = 1; i < 9; i++) { ctx.beginPath(); ctx.moveTo(300 + i * 31, 1100); ctx.lineTo(300 + i * 31, 1212); ctx.stroke(); }
+    ctx.fillStyle = "#F2F4F7"; ctx.globalAlpha = 0.5; ctx.fillRect(308, 1160, 264, 46); ctx.globalAlpha = 1;
+    ctx.strokeStyle = "rgba(242,244,247,.55)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(440, 1060); ctx.lineTo(440, 1090); ctx.stroke();   // mobile
+    for (let i = 0; i < 3; i++) { const a = t * 3.1 + i * 2.09; ctx.fillStyle = [P.amber, P.cyan, "#F2F4F7"][i]; ctx.beginPath(); ctx.arc(440 + Math.cos(a) * 46, 1092 + Math.sin(a) * 8, 10, 0, 7); ctx.fill(); }
+  } else {
+    bed(220);
+    ctx.fillStyle = "#5A4636"; ctx.fillRect(640, 1120, 270, 18); ctx.fillRect(650, 1138, 14, 78); ctx.fillRect(886, 1138, 14, 78);   // desk
+    if (A < 12) { ctx.fillStyle = P.amber; rrect(ctx, 570, 1150, 56, 66, 12); ctx.fill(); ctx.fillStyle = "#E8EEF3"; ctx.fillRect(700, 1096, 70, 24); ctx.fillStyle = "#8FD18A"; ctx.fillRect(782, 1086, 30, 34); }   // backpack, books
+    else {
+      ctx.fillStyle = "#0B0F14"; rrect(ctx, 700, 1050, 150, 90, 6); ctx.fill(); ctx.fillStyle = "rgba(61,214,245,.85)"; ctx.fillRect(710, 1060, 130, 70);
+      ctx.fillStyle = "#1B222C"; ctx.fillRect(686, 1140, 180, 8);
+      const g = ctx.createRadialGradient(775, 1100, 10, 775, 1100, 150); g.addColorStop(0, "rgba(61,214,245,.28)"); g.addColorStop(1, "rgba(61,214,245,0)"); ctx.fillStyle = g; ctx.fillRect(600, 960, 340, 220);
+    }
+  }
+  ctx.restore();
+}
+const curveAt = (pts, u) => { for (let i = 1; i < pts.length; i++) if (u <= pts[i][0] || i === pts.length - 1) { const [u0, w0] = pts[i - 1], [u1, w1] = pts[i]; return w0 + (w1 - w0) * clamp((u - u0) / Math.max(1e-9, u1 - u0)); } return 0; };
+let SLEEP_OFF = null;
+function heroClock(ctx, t, HR, cam) { // "sleepless": a 24 h dial that laps, a cup tower that grows once a day, and (after 2 days) our picture of hallucination
+  const wob = clamp((HR - 40) / 180), day = Math.floor(HR / 24) + 1, hr = (7 + Math.floor(HR)) % 24;
+  const g = (() => {
+    if (wob > 0.02) {
+      if (!SLEEP_OFF) SLEEP_OFF = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(W, H) : Object.assign(document.createElement("canvas"), { width: W, height: H });
+      const c = SLEEP_OFF.getContext("2d"); c.clearRect(0, 0, W, H); return c;
+    }
+    return ctx;
+  })();
+  const direct = g === ctx;
+  const cx = 450, cy = 915, R = 210, ang = ((7 + HR) / 24) * Math.PI * 2 - Math.PI / 2;
+  g.save();
+  if (direct) { g.translate(540, 960); g.scale(cam, cam); g.translate(-540, -960); }
+  g.fillStyle = "#1B222C"; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill();
+  g.strokeStyle = "rgba(61,214,245,.55)"; g.lineWidth = 5; g.stroke();
+  g.strokeStyle = "#0B0F14"; g.lineWidth = 44;   // night (22:00-06:00)
+  g.beginPath(); g.arc(cx, cy, R - 30, -Math.PI / 2 + (22 / 24) * Math.PI * 2, -Math.PI / 2 + (30 / 24) * Math.PI * 2); g.stroke();
+  g.fillStyle = "rgba(242,244,247,.8)"; g.textAlign = "center"; g.textBaseline = "middle"; g.font = mono(26);
+  for (const [h, l] of [[0, "12 AM"], [6, "6 AM"], [12, "12 PM"], [18, "6 PM"]]) { const a = (h / 24) * Math.PI * 2 - Math.PI / 2; g.fillText(l, cx + Math.cos(a) * (R + 46), cy + Math.sin(a) * (R + 46)); }
+  g.strokeStyle = "rgba(242,244,247,.5)"; g.lineWidth = 3;
+  for (let i = 0; i < 24; i++) { const a = (i / 24) * Math.PI * 2 - Math.PI / 2; g.beginPath(); g.moveTo(cx + Math.cos(a) * (R - 8), cy + Math.sin(a) * (R - 8)); g.lineTo(cx + Math.cos(a) * (R - 22), cy + Math.sin(a) * (R - 22)); g.stroke(); }
+  g.strokeStyle = P.amber; g.lineWidth = 12; g.lineCap = "round"; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(ang) * (R - 38), cy + Math.sin(ang) * (R - 38)); g.stroke();
+  g.fillStyle = P.amber; g.beginPath(); g.arc(cx + Math.cos(ang) * (R - 38), cy + Math.sin(ang) * (R - 38), 22, 0, 7); g.fill();
+  g.fillStyle = "#0B0F14"; g.beginPath(); g.arc(cx, cy, 15, 0, 7); g.fill();
+  g.fillStyle = P.text; g.font = mono(54); g.fillText(`${hr % 12 || 12}:00 ${hr < 12 ? "AM" : "PM"}`, cx, cy + 92);
+  g.fillStyle = P.cyan; g.font = mono(32); g.fillText(`DAY ${day}`, cx, cy + R + 88);
+  const cups = Math.min(12, day);   // the cup tower: one cup per day awake
+  for (let i = 0; i < cups; i++) {
+    const sway = Math.sin(t * 2.1 + i * 0.55) * wob * (2 + i * 1.6), y = 1196 - (i + 1) * 40;
+    g.fillStyle = i % 2 ? "#E8EEF3" : "#C9D2DC"; g.beginPath(); g.moveTo(790 + sway - 50, y); g.lineTo(790 + sway + 50, y); g.lineTo(790 + sway + 40, y + 36); g.lineTo(790 + sway - 40, y + 36); g.closePath(); g.fill();
+  }
+  if (HR >= 17 && HR < 28) {   // performance equivalence, shown only inside the studied range (up to 28 h awake)
+    const chip = HR < 24 ? "PERFORMS LIKE 0.05% BAC" : "PERFORMS LIKE 0.10% BAC";
+    g.font = mono(24); const w = g.measureText(chip).width + 36;
+    g.fillStyle = "rgba(11,15,20,.82)"; rrect(g, 790 - w / 2, 684, w, 48, 10); g.fill();
+    g.strokeStyle = P.amber; g.lineWidth = 3; g.stroke(); g.fillStyle = P.amber; g.fillText(chip, 790, 709);
+  }
+  g.restore();
+  if (!direct) {
+    ctx.save(); ctx.translate(540, 960); ctx.scale(cam, cam); ctx.translate(-540, -960);
+    for (let y = 640; y < 1250; y += 6) { const dx = Math.sin(y * 0.021 + t * 1.7) * wob * 30; ctx.drawImage(SLEEP_OFF, 0, y, W, 6, dx, y, W, 6); }
+    ctx.fillStyle = `rgba(36,70,52,${(0.28 * wob).toFixed(3)})`; ctx.fillRect(0, 640, W, 610);   // a grey-green grade as it gets worse
+    ctx.restore();
+  }
+}
 function drawWhatIfSim(ctx, t, p, D) {
-  const stages = rows(p.stages), n = Math.max(1, stages.length), tEnd = D - TAIL, run = tEnd - HOLD;
-  const stageT = run / n;
-  const si = t < HOLD ? -1 : Math.min(n - 1, Math.floor((t - HOLD) / stageT));
-  const sT = si < 0 ? 0 : t - HOLD - si * stageT;
+  const { texts: stages, starts, n, tEnd } = stagePlan(p, D);
+  let si = -1; for (let i = 0; i < n; i++) if (t >= starts[i] - 1e-9) si = i;
+  const sT = si < 0 ? 0 : t - starts[si];
+  const curve = String(p.curve || "").split(",").map((x) => x.split(":").map(Number)).filter((x) => x.length === 2 && x.every(Number.isFinite));  // "u:w,u:w": piecewise-linear time map
+  const lin = String(p.ease || "") === "linear" || curve.length > 1, calm = ["seasons", "clock"].includes(String(p.hero || ""));   // calm = a pause, not a crash
   const contact = t >= tEnd, ct = t - tEnd;
   const hit = (si >= 0 && sT < 0.35) || contact;
   const u = clamp(t / tEnd);
-  const a = num(p.start, 0), b = num(p.end, 1e6), v = a + (b - a) * Math.pow(u, 2.2);
+  const a = num(p.start, 0), b = num(p.end, 1e6), v = a + (b - a) * (curve.length > 1 ? curveAt(curve, u) : lin ? u : Math.pow(u, 2.2));
   const w = b === a ? 1 : clamp((v - a) / (b - a));
   const rate = Math.max(1e-9, num(p.rate, 1)), simS = Math.abs(v - a) / rate;
-  const shake = contact && ct < 0.3 ? Math.sin(ct * 110) * 14 * (1 - ct / 0.3) : 0;
-  const cam = 1 + 0.3 * clamp(t / tEnd);
+  const shake = contact && !calm && ct < 0.3 ? Math.sin(ct * 110) * 14 * (1 - ct / 0.3) : 0;
+  const cam = 1 + (calm ? 0.06 : 0.3) * clamp(t / tEnd);
   ctx.save(); ctx.translate(shake, shake * 0.5);
   const hero = String(p.hero || ""), endWord = String(p.endWord || "").trim().toUpperCase() || "CONTACT";
   simBg(ctx, t);
@@ -214,23 +334,27 @@ function drawWhatIfSim(ctx, t, p, D) {
   if (hero === "sun") heroSun(ctx, Math.min(t, tEnd), w, hit, cam);
   else if (hero === "dots") heroDots(ctx, t, Math.abs(v - a), Math.abs(b - a), contact, ct, cam);
   else if (hero === "atmosphere") heroAtmos(ctx, t, 1 - w, hit, cam);
+  else if (hero === "clock") heroClock(ctx, t, v, cam);
+  else if (hero === "seasons") heroSeasons(ctx, t, contact ? Math.floor(v + 1e-9) + 0.75 : v, cam);   // the pause lands on a still winter frame
   else [mx, my] = simHero(ctx, Math.min(t, tEnd), w, hit, cam);
-  if (contact && ct < 0.7) { // shockwave from the contact point
+  if (contact && !calm && ct < 0.7) { // shockwave from the contact point
     ctx.save(); ctx.strokeStyle = `rgba(255,90,60,${0.7 * (1 - ct / 0.7)})`; ctx.lineWidth = 10;
     ctx.beginPath(); ctx.arc(540 + (mx - 540) * cam, 960 + (my - 960) * cam, 60 + ct * 1300, 0, 7); ctx.stroke(); ctx.restore();
   }
-  const unit = String(p.unit || "").trim(), lbl = String(p.label || "COUNT");
+  const lbl = String(p.label || "COUNT");
+  const shown = (x) => (String(p.int || "") === "floor" ? Math.floor(x + 1e-9).toLocaleString("en-US") : fmt(x));   // an age ticks over on its birthday
+  const unit0 = String(p.unit || "").trim(), unitFor = (x) => (String(p.int || "") === "floor" && Math.floor(x + 1e-9) === 1 ? unit0.replace(/s$/, "") : unit0);
   if (t < HOLD) {
     const bt = premiseHook(ctx, t, premiseLines(p));
-    RTS.drawCounter(ctx, fmt(v), { y: bt + 24, size: 96, unit, label: "" });
+    RTS.drawCounter(ctx, shown(v), { y: bt + 24, size: 96, unit: unitFor(v), label: "" });
   } else {
     RTS.drawHudFrame(ctx, { scrim: true });
-    RTS.drawPovTag(ctx, `${epi(p)} · ${String(p.tag || "").trim() || "WHAT IF"}`, { right: simClock(simS) });
-    const full = Math.abs(b - a) / rate, per = full / Math.max(0.1, tEnd - HOLD); // average sim seconds per real second
+    RTS.drawPovTag(ctx, `${epi(p)} · ${String(p.tag || "").trim() || "WHAT IF"}`, { right: simClock(simS, String(p.clock || "") === "years") });
+    const full = Math.abs(b - a) / rate, per = full / Math.max(0.1, lin ? tEnd : tEnd - HOLD); // average sim seconds per real second
     ctx.save(); ctx.font = mono(24); track(ctx, 1.2); ctx.fillStyle = P.cyan; ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
     ctx.fillText(`▶▶ 1 S ≈ ${simSpan(per)}`, 940, 296); ctx.restore();
-    const cb = RTS.drawCounter(ctx, fmt(v), { y: 320, size: 150, unit, label: lbl,
-      desc: contact ? endWord : `STAGE ${si + 1}/${n}`, color: hit ? P.alert : P.amber });
+    const cb = RTS.drawCounter(ctx, shown(v), { y: 320, size: 150, unit: unitFor(v), label: lbl,
+      desc: contact ? (calm ? `STAGE ${n}/${n} · ${endWord}` : endWord) : `STAGE ${Math.max(1, si + 1)}/${n}`, color: (calm && !contact ? false : hit) ? P.alert : P.amber });
     if (String(p.rule || "").trim()) {
       ctx.save(); ctx.font = mono(28); track(ctx, 1.6); ctx.fillStyle = "rgba(242,244,247,.78)"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
       ctx.fillText(String(p.rule).toUpperCase(), 64, cb + 40, 876); ctx.restore();
@@ -244,7 +368,7 @@ function drawWhatIfSim(ctx, t, p, D) {
     if (hit && sT < 1 / 30 && !contact) { ctx.fillStyle = "rgba(255,255,255,.45)"; ctx.fillRect(0, 0, W, H); }
   }
   ctx.restore();
-  if (contact && ct < 0.25) { ctx.fillStyle = `rgba(255,255,255,${0.75 * (1 - ct / 0.25)})`; ctx.fillRect(0, 0, W, H); }
+  if (contact && !calm && ct < 0.25) { ctx.fillStyle = `rgba(255,255,255,${0.75 * (1 - ct / 0.25)})`; ctx.fillRect(0, 0, W, H); }
 }
 
 // ---------- 1b. What If · Night Sky (3D): one three.js scene (make/3d-src/scene3d.js) under our scene-style HUD ----------
@@ -553,9 +677,9 @@ export const TEMPLATES = [
       { key: "stages", label: "Captions, one per beat (one per line)", type: "textarea", def: "Tides start to climb\nCoastlines go under at dawn\nThe sky is mostly Moon\nIt doesn't stop." },
       { key: "episode", label: "Sim number", type: "text", def: "001" },
     ],
-    duration: (p) => { const n = rows(p.stages).length; return dur(HOLD + TAIL, n <= 4 ? 3.2 : Math.max(2.6, Math.min(3.2, 15.5 / n)), n, 8, 45); }, draw: drawWhatIfSim, bg: (ctx, t) => simBg(ctx, t),
-    cues: (p, D) => { const n = Math.max(1, rows(p.stages).length), st = (D - HOLD - TAIL) / n;
-      return [{ t: HOLD, k: "exit" }, ...Array.from({ length: n }, (_, i) => ({ t: HOLD + i * st, k: "stage", i })), { t: D - TAIL, k: "hit" }]; } },
+    duration: (p) => { const L = num(p.len, 0); if (L > 0) return clamp(L, 8, 60); const n = rows(p.stages).length; return dur(HOLD + TAIL, n <= 4 ? 3.2 : Math.max(2.6, Math.min(3.2, 15.5 / n)), n, 8, 45); }, draw: drawWhatIfSim, bg: (ctx, t) => simBg(ctx, t),
+    cues: (p, D) => { const sp = stagePlan(p, D);
+      return [{ t: HOLD, k: "exit" }, ...sp.starts.map((t, i) => ({ t, k: "stage", i })), { t: sp.tEnd, k: "hit" }]; } },
   { id: "day-timeline", name: "Day 1 → Day 10,000", brand: "ranthesim", pro: false, blurb: "A timeline that escalates, one beat at a time.",
     fields: [
       { key: "question", label: "The question", type: "text", def: "What if nobody slept for a week?" },
@@ -633,6 +757,11 @@ export const DEMOS = {
     premise: "Earth lost 1% of its\noxygen every second?", label: "Oxygen left", unit: "%", start: "100", end: "0", rate: "1",
     tag: "Earth loses 1% O2/s", rule: "Rule: 1% per second · not real chemistry", episode: "006", hero: "atmosphere", endWord: "Gone",
     stages: "Oxygen drains every second.\nFull to zero in 100 seconds.\nDenver-thin air.\nCandles go out.\nGas flames die." } },
+  life: { t: "whatif-sim", name: "Your life played at 1 second per year", p: {
+    premise: "Your life played at\n1 second per year?", label: "Age", unit: "years", start: "0", end: "18", rate: "0.0000000316881",
+    tag: "Your life", rule: "Rule: 1 second = 1 year · US averages", episode: "005", hero: "seasons", endWord: "Paused",
+    ease: "linear", len: "20", tail: "2", int: "floor", clock: "years",
+    stages: "Your life. 1 second = 1 year. @3\nAge 5: school starts. @5\nSleep so far: about 3.5 years. @7\nDouble digits: age 10. @10\n500 million heartbeats. @13.6\nTime with family: 4.3 hours a day. @15\nMost teens still live at home. @16.6\nAbout half your family time: used. @18" } },
   moon3d: { t: "whatif-3d", name: "Moon 1 km closer (3D)", p: {} },
   sleep: { t: "day-timeline", name: "Nobody slept for a week", p: {} },
   phone3am: { t: "notif-stack", name: "Your phone at 3 a.m.", p: {} },
