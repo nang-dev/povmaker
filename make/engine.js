@@ -142,18 +142,18 @@ function simHero(ctx, t, w, hot, cam) {
 const TAIL = 1.5; // contact hold: counter red + flash before the end card
 // ---- per-preset heroes for the 2D sim (Muse presets review): `hero` = sun | dots | atmosphere (default = the orbit-into-Earth) ----
 // All are pure functions of the counter, drawn in the 650-1250 hero band under the same camera push (cam).
-function heroSun(ctx, t, w, hot, cam) { // "commute": you fly in to a big amber Sun; the counter is the distance to it
-  const cx = 540, cy = 960;
+function heroSun(ctx, t, w, hot, cam) { // "commute": you fly in to a big amber Sun that swells as the distance drops; the counter is the distance to it
+  const cx = 540, cy = 960, k = smoothstep(w), sr = 122 * (1 + 0.8 * k) + 3 * Math.sin(t * 2.4);   // 1x -> 1.8x (the hero band ends at the caption bar)
   ctx.save(); ctx.translate(cx, cy); ctx.scale(cam, cam); ctx.translate(-cx, -cy);
   ctx.strokeStyle = "rgba(61,214,245,.18)"; ctx.lineWidth = 2;
   for (const r of [200, 320, 440]) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke(); }
-  const gl = ctx.createRadialGradient(cx, cy, 70, cx, cy, 400);
+  const gl = ctx.createRadialGradient(cx, cy, sr * 0.6, cx, cy, sr * 2.4);
   gl.addColorStop(0, "rgba(255,176,32,.5)"); gl.addColorStop(1, "rgba(255,176,32,0)");
-  ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(cx, cy, 400, 0, 7); ctx.fill();
-  const sr = 122 + 3 * Math.sin(t * 2.4), g = ctx.createRadialGradient(cx - 34, cy - 34, 10, cx, cy, sr + 10);
+  ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(cx, cy, sr * 2.4, 0, 7); ctx.fill();
+  const g = ctx.createRadialGradient(cx - sr * 0.28, cy - sr * 0.28, sr * 0.08, cx, cy, sr * 1.08);
   g.addColorStop(0, "#FFE2A0"); g.addColorStop(0.55, "#FFB020"); g.addColorStop(1, "#E07A00");
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, sr, 0, 7); ctx.fill();
-  const orbR = 150 + 290 * (1 - w), ang = t * (0.5 + 0.9 * w) + 0.8, sq = 0.8 + 0.2 * w;
+  const orbR = 250 + 190 * (1 - w), ang = t * (0.5 + 0.9 * w) + 0.8, sq = 0.8 + 0.2 * w;   // ends on the Sun's limb (1.8x radius 220 + you)
   for (let i = 1; i <= 14; i++) {
     const a = ang - i * 0.045;
     ctx.fillStyle = `rgba(61,214,245,${0.34 * (1 - i / 14)})`;
