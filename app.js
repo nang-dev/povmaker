@@ -33,12 +33,8 @@
   $("yr").textContent = new Date().getFullYear();
 
   var cta = $("cta");
-  cta.textContent = B.cta || C.ctaLabel || cta.textContent;
-  if (C.paymentUrl) {
-    var u = new URL(C.paymentUrl);
-    ["utm_source", "utm_campaign", "utm_medium"].forEach(function (k) { if (utm[k]) u.searchParams.set(k, utm[k]); });
-    cta.href = u.toString();
-  }
+  cta.textContent = B.cta || cta.textContent;
+  if (C.paymentUrl) { var wl = $("waitlist"); if (wl) wl.hidden = true; } else { var pc = $("pro-cta"); if (pc) pc.textContent = "Get early access"; }
   cta.addEventListener("click", function () { send("/track", { event: "cta_click" }); });
 
   if (C.videos && C.videos.length) {

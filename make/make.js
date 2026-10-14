@@ -1,6 +1,7 @@
 import { W, H, loadFonts, drawSafeOverlay } from "./brand.js";
 import { TEMPLATES, defaults, renderFrame } from "./engine.js";
 import { exportMp4, canWebCodecs } from "./export.js";
+import * as Lic from "./licence.js";
 
 const $ = (id) => document.getElementById(id);
 const FREE_PER_DAY = 3;
@@ -10,40 +11,16 @@ const state = { tpl: TEMPLATES[0], params: {}, playing: true, safe: false, pro: 
 // ---- tracking: none on a static host; UTMs ride along to checkout (see bio page) ----
 const track = () => {};
 
-// ---- licence ----
-const LS = "povmaker.licence";
-const lic = () => { try { return JSON.parse(localStorage.getItem(LS) || "null"); } catch { return null; } };
-// Lemon Squeezy public licence API, called straight from the browser (no API key needed).
-// First use on a device: activate. Later: validate that instance. Result cached in localStorage.
-const LSAPI = "https://api.lemonsqueezy.com/v1/licenses/";
-const STORE_ID = String((window.SITE_CONFIG || {}).lsStoreId || "");
-const lsPost = async (path, fields) => {
-  const r = await fetch(LSAPI + path, { method: "POST", headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(fields) });
-  return r.json().catch(() => ({}));
-};
-const storeOk = (d) => !STORE_ID || String(d && d.meta && d.meta.store_id) === STORE_ID;
-async function callValidate({ key, instance_id }) {
-  if (!key) return { valid: false, error: "Enter a key." };
-  if (!instance_id) {
-    const a = await lsPost("activate", { license_key: key, instance_name: "web-" + Math.random().toString(36).slice(2, 10) });
-    if (!a.activated) return { valid: false, error: a.error || "That key isn't valid, or it's already used on 3 devices." };
-    if (!storeOk(a)) return { valid: false, error: "That key isn't for POVMaker." };
-    return { valid: true, instance_id: a.instance && a.instance.id };
-  }
-  const v = await lsPost("validate", { license_key: key, instance_id });
-  const st = v.license_key && v.license_key.status;
-  if (v.valid && storeOk(v) && st !== "expired" && st !== "disabled") return { valid: true, instance_id };
-  return { valid: false, error: v.error || "Licence is no longer active." };
-}
+// ---- licence (logic in licence.js; shared with thanks.html) ----
 async function checkLicence() {
-  const l = lic();
+  const l = Lic.stored();
   if (!l) return setPro(false);
   const fresh = Date.now() - l.checked < 24 * 3600e3;
   if (fresh) return setPro(true);
   try {
-    const r = await callValidate({ key: l.key, instance_id: l.instance_id });
-    if (r.valid) { localStorage.setItem(LS, JSON.stringify({ ...l, checked: Date.now() })); setPro(true); }
-    else { localStorage.removeItem(LS); setPro(false, "Your Pro licence is no longer active."); }
+    const r = await Lic.check({ key: l.key, instance_id: l.instance_id });
+    if (r.valid) { Lic.store({ ...l, checked: Date.now() }); setPro(true); }
+    else { Lic.clear(); setPro(false, "Your Pro licence is no longer active."); }
   } catch { setPro(Date.now() - l.checked < 7 * 24 * 3600e3); } // offline grace: 7 days
 }
 function setPro(on, msg) {
@@ -56,11 +33,9 @@ function setPro(on, msg) {
 $("activate").onclick = async () => {
   const key = $("key").value.trim(); if (!key) return;
   $("keymsg").className = "msg"; $("keymsg").textContent = "Checking…";
-  try {
-    const r = await callValidate({ key });
-    if (r.valid) { localStorage.setItem(LS, JSON.stringify({ key, instance_id: r.instance_id, checked: Date.now() })); setPro(true); $("keymsg").className = "msg ok"; $("keymsg").textContent = "Pro activated. Thank you!"; $("key").value = ""; }
-    else { $("keymsg").className = "msg err"; $("keymsg").textContent = r.error || "That key isn't valid."; }
-  } catch { $("keymsg").className = "msg err"; $("keymsg").textContent = "Couldn't reach the licence server. Try again."; }
+  const r = await Lic.activate(key);
+  if (r.ok) { setPro(true); $("keymsg").className = "msg ok"; $("keymsg").textContent = "Pro activated. Thank you!"; $("key").value = ""; }
+  else { $("keymsg").className = "msg err"; $("keymsg").textContent = r.error; }
 };
 
 // ---- free quota ----

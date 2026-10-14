@@ -2,7 +2,26 @@
 <html lang="en" data-brand="ranthesim"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Thank you · POVMaker</title><link rel="stylesheet" href="style.css"></head>
 <body><main class="wrap page"><h1>You're Pro. Thank you!</h1>
-<p>Your licence key is in the receipt email from Lemon Squeezy (and on your order page). Open POVMaker, paste the key under "Pro licence key" and press Activate.</p>
-<p><a class="btn primary" href="make/">Open POVMaker</a></p>
-<p class="muted">Didn't get the email? Check spam, or write to <a href="mailto:studionorthline88@gmail.com">studionorthline88@gmail.com</a>.</p>
-</main></body></html>
+<p>Your licence key is on the Lemon Squeezy confirmation page and in your receipt email. Paste it below to unlock Pro on this device.</p>
+<div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
+  <input id="key" placeholder="Licence key" aria-label="Licence key" autocomplete="off" style="flex:1;min-width:200px">
+  <button id="activate" class="btn primary inline">Activate Pro</button>
+</div>
+<p id="msg" class="msg" role="status" aria-live="polite"></p>
+<p><a class="btn sec" href="make/">Open POVMaker</a></p>
+<p class="muted">Didn't get the email? Check spam, or write to <a href="mailto:studionorthline88@gmail.com">studionorthline88@gmail.com</a>. Up to 3 devices per key.</p>
+</main>
+<script src="config.js"></script>
+<script type="module">
+import * as Lic from "./make/licence.js";
+const $ = (i) => document.getElementById(i), q = new URLSearchParams(location.search);
+// Lemon Squeezy can append ?license_key=... if configured in the redirect; accept it if present.
+const pre = q.get("license_key"); if (pre) $("key").value = pre;
+$("activate").onclick = async () => {
+  const key = $("key").value.trim(); if (!key) return;
+  $("msg").className = "msg"; $("msg").textContent = "Checking…";
+  const r = await Lic.activate(key);
+  if (r.ok) { $("msg").className = "msg ok"; $("msg").innerHTML = 'Pro activated. <a href="make/">Open POVMaker →</a>'; }
+  else { $("msg").className = "msg err"; $("msg").textContent = r.error; }
+};
+</script></body></html>
