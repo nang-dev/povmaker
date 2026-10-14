@@ -1,6 +1,6 @@
 import { W, H, loadFonts, drawSafeOverlay } from "./brand.js";
 import { TEMPLATES, DEMOS, defaults, renderFrame } from "./engine.js";
-import { exportMp4, canWebCodecs } from "./export.js";
+import { exportMp4, canWebCodecs, bedWav } from "./export.js";
 import { renderBed, RATE } from "./audio.js";
 import * as Lic from "./licence.js";
 
@@ -125,10 +125,13 @@ $("export").onclick = async () => {
   try {
     const blob = await exportMp4({ tpl: state.tpl, params: state.params, fps: state.pro ? 60 : 30, watermark: !state.pro, endCard: !state.pro, audio: sound(), onProgress: (p) => (prog.value = p) });
     const url = URL.createObjectURL(blob);
-    $("out").innerHTML = `<video src="${url}" controls loop playsinline></video><p><a class="btn primary" download="povmaker-${state.tpl.id}.mp4" href="${url}">Download MP4</a></p>`;
+    const wantSound = sound(), noAudio = wantSound && !blob.hasAudio;
+    const wav = noAudio ? URL.createObjectURL(bedWav(state.tpl, state.params, { endCard: !state.pro })) : "";
+    $("out").innerHTML = `<video src="${url}" controls loop playsinline></video><p><a class="btn primary" download="povmaker-${state.tpl.id}.mp4" href="${url}">Download MP4</a></p>` +
+      (noAudio ? `<p class="muted">This browser can't put sound inside the MP4. <a download="povmaker-${state.tpl.id}.wav" href="${wav}">Download the sound (WAV)</a> and add it when you post (Instagram, TikTok and CapCut all take your own audio), or export on desktop Chrome / Safari 26 for a video with sound.</p>` : "");
     if (!state.pro) { bump(); setPro(false); }
     msg.className = "msg ok";
-    msg.textContent = "Done. Post it with the AI-generated label on." + (sound() && !blob.hasAudio ? " (No sound: this browser can't encode audio. Chrome or Safari 26 can.)" : "");
+    msg.textContent = "Done. Post it with the AI-generated label on." + (sound() && !blob.hasAudio ? " The video has no sound in this browser, but the sound is available below." : "");
     track("export_done", { template: state.tpl.id, pro: state.pro ? 1 : 0, secs: Math.round(D), audio: blob.hasAudio ? 1 : 0, demo: state.demo ? q.get("demo") : "" });
   } catch (e) { msg.className = "msg err"; msg.textContent = e.message || "Export failed."; }
   finally { $("export").disabled = false; prog.hidden = true; }

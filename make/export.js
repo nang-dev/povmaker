@@ -31,6 +31,17 @@ export function ascFrom(desc) {
   return b.slice(i, i + n);
 }
 
+// Fallback for browsers that can't encode audio into the MP4 (iOS before 26): the same bed as a 16-bit stereo 48 kHz WAV
+// (L=R, so it measures the same -14 LUFS as the MP4) that the user can add in their editor / when posting. ~9 MB for 45 s.
+export function bedWav(tpl, params, { endCard = false } = {}) {
+  const s = renderBed(tpl, params, { endCard }).samples, n = s.length, b = new DataView(new ArrayBuffer(44 + n * 4));
+  const w = (o, t) => [...t].forEach((c, i) => b.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF"); b.setUint32(4, 36 + n * 4, true); w(8, "WAVEfmt "); b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 2, true);
+  b.setUint32(24, RATE, true); b.setUint32(28, RATE * 4, true); b.setUint16(32, 4, true); b.setUint16(34, 16, true); w(36, "data"); b.setUint32(40, n * 4, true);
+  for (let i = 0; i < n; i++) { const v = Math.max(-1, Math.min(1, s[i])) * 32767; b.setInt16(44 + i * 4, v, true); b.setInt16(46 + i * 4, v, true); }
+  return new Blob([b], { type: "audio/wav" });
+}
+
 export const canWebCodecs = () => typeof VideoEncoder !== "undefined" && typeof VideoFrame !== "undefined";
 
 export async function exportMp4({ tpl, params, fps, watermark, endCard, audio = true, onProgress }) {
