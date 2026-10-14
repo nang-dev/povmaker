@@ -34,7 +34,7 @@
 
   var cta = $("cta");
   cta.textContent = B.cta || cta.textContent;
-  if (C.paymentUrl) { var wl = $("waitlist"); if (wl) wl.hidden = true; } else { var pc = $("pro-cta"); if (pc) pc.textContent = "Get early access"; }
+  if (C.paymentUrl) { var wl = $("waitlist"); if (wl) wl.hidden = true; } 
   cta.addEventListener("click", function () { send("/track", { event: "cta_click" }); });
 
   if (C.videos && C.videos.length) {
@@ -65,4 +65,5 @@
   });
 
   send("/track", { event: "visit" });
+  if (window.POVTrack) window.POVTrack.track("visit_bio", { brand: brandKey, source: utm.utm_source, campaign: utm.utm_campaign });
 })();

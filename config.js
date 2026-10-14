@@ -7,6 +7,10 @@ window.SITE_CONFIG = {
   checkoutUrls: { test: "", live: "" },
   paymentUrl: "", // derived from mode+checkoutUrls by upgrade.js; leave empty
   ctaLabel: "Get early access",
+  priceLabel: "$9/mo", // shown on the Upgrade button and in the plan box (keep in sync with the LS product + terms)
+  // Funnel analytics (no backend). Cookie-less Umami Cloud script; EMPTY websiteId = analytics off, nothing is loaded.
+  // Events: visit_bio, visit_make, template_select, export_done, upgrade_click.
+  analytics: { provider: "umami", websiteId: "", src: "https://cloud.umami.is/script.js" },
   api: "", // no backend on GitHub Pages; waitlist = mailto, UTMs ride to checkout.
   waitlistEmail: "studionorthline88@gmail.com",
   lsStoreId: "", // Lemon Squeezy store id (Settings > Stores); licence keys from other stores are rejected
