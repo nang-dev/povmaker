@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" data-brand="ranthesim"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>POVMaker · make a video</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+ .app{max-width:980px;margin:0 auto;padding:16px;display:grid;gap:20px}
+ @media(min-width:820px){.app{grid-template-columns:360px 1fr}}
+ .stage{display:grid;gap:10px;justify-items:center;align-content:start}
+ canvas{width:100%;max-width:340px;aspect-ratio:9/16;background:#000;border-radius:12px}
+ .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 4px}
+ textarea{width:100%;min-height:110px;padding:12px;border-radius:var(--r);border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit}
+ select{width:100%;padding:12px;border-radius:var(--r);border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit}
+ .btn.sec{background:var(--card);color:var(--fg);border:1px solid var(--line)}
+ .btn.inline{display:inline-block;width:auto;padding:10px 14px;font-size:15px}
+ .pro{font:700 11px "JetBrains Mono",monospace;padding:2px 6px;border-radius:4px;background:var(--acc);color:var(--accfg);vertical-align:middle}
+ .box{padding:14px;border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
+ progress{width:100%}
+ #out video{width:100%;max-width:340px;border-radius:12px}
+</style></head>
+<body>
+<main class="app">
+ <section>
+  <p><a href="../index.html">← Home</a> · <a href="../pricing.html">Pricing</a></p>
+  <h1>POVMaker</h1>
+  <label for="tpl">Template</label><select id="tpl"></select>
+  <p id="blurb" class="muted"></p>
+  <div id="fields"></div>
+  <div class="box" style="margin-top:16px">
+   <div id="plan"></div>
+   <div class="row" style="margin-top:8px">
+    <input id="key" placeholder="Pro licence key" aria-label="Licence key" autocomplete="off" style="flex:1;min-width:160px">
+    <button id="activate" class="btn sec inline">Activate</button>
+   </div>
+   <p id="keymsg" class="msg" style="text-align:left"></p>
+  </div>
+ </section>
+ <section class="stage">
+  <canvas id="cv" width="1080" height="1920"></canvas>
+  <div class="row">
+   <button id="play" class="btn sec inline">Pause</button>
+   <label style="margin:0"><input type="checkbox" id="safe" style="width:auto"> Safe zones</label>
+  </div>
+  <button id="export" class="btn primary" style="max-width:340px">Export MP4</button>
+  <progress id="prog" value="0" max="1" hidden></progress>
+  <p id="expmsg" class="msg"></p>
+  <div id="out"></div>
+ </section>
+</main>
+<script src="../config.js"></script>
+<script type="module" src="make.js"></script>
+</body></html>

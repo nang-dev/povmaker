@@ -1,0 +1,43 @@
+/* Brand themes per shared/brands.md. data-brand is set in <head> before paint. */
+:root{--bg:#0A0E14;--card:#121a26;--line:#1E2A3A;--fg:#F2F4F7;--mut:#8b97a8;--acc:#FFB020;--accfg:#0A0E14;--acc2:#3DD6F5;--hfont:"Space Grotesk",system-ui,sans-serif;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--r:6px}
+html[data-brand=sidecharpov]{--bg:#ffffff;--card:#f3f4f6;--line:#e5e7eb;--fg:#111111;--mut:#5b6472;--acc:#FFE14D;--accfg:#111111;--acc2:#3B82F6;--hfont:"Anton",Impact,sans-serif;--font:"Inter",system-ui,sans-serif;--r:14px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 var(--font)}
+a{color:var(--fg)}
+.wrap{max-width:480px;margin:0 auto;padding:max(24px,env(safe-area-inset-top)) 20px 40px}
+.hero{text-align:center;padding:24px 0 8px}
+.logo{width:72px;height:72px;margin:0 auto 16px;display:grid;place-items:center}
+html[data-brand=ranthesim] .logo{font:700 30px "JetBrains Mono",monospace;color:var(--acc);border:2px solid var(--line);border-radius:6px;background:var(--bg)}
+html[data-brand=ranthesim] .logo::before{content:"[ ▶ ]"}
+html[data-brand=sidecharpov] .logo{font:26px var(--hfont);background:var(--acc);color:#111;transform:rotate(-6deg);border-radius:8px;width:96px;height:56px;margin-bottom:24px}
+html[data-brand=sidecharpov] .logo::before{content:"POV:"}
+h1{font:700 30px/1.1 var(--hfont);margin:0 0 10px}
+html[data-brand=sidecharpov] h1{font-weight:400;font-size:38px;text-transform:uppercase;letter-spacing:.01em}
+h2{font:700 13px "JetBrains Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:32px 0 12px}
+html[data-brand=sidecharpov] h2{font-family:var(--font)}
+.sub{color:var(--mut);margin:0 0 20px}
+.muted{color:var(--mut)}.small{font-size:13px;text-align:center;margin-top:32px}
+.btn{display:block;width:100%;padding:15px 18px;border:0;border-radius:var(--r);font:700 17px var(--font);text-align:center;text-decoration:none;cursor:pointer}
+.btn.primary{background:var(--acc);color:var(--accfg)}
+.btn:active{transform:scale(.98)}
+.videos{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.videos a{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:14px 16px;border-radius:var(--r);background:var(--card);border:1px solid var(--line);text-decoration:none}
+.videos .tag{font:700 12px "JetBrains Mono",monospace;color:var(--acc2)}
+#wl-form{display:grid;gap:10px;margin-top:12px}
+input{width:100%;padding:15px 16px;border-radius:var(--r);border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit}
+input:focus{outline:2px solid var(--acc)}
+.msg{min-height:1.5em;margin:10px 0 0;text-align:center}
+.msg.ok{color:#2f9e5a}.msg.err{color:#e5484d}
+.socials{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:28px}
+.socials a{padding:8px 14px;border-radius:999px;background:var(--card);border:1px solid var(--line);text-decoration:none;font-size:14px}
+/* legal / pricing pages */
+.page{max-width:680px}
+.page h1{font-size:28px;margin-top:8px}
+.page h2{font-size:15px;text-transform:none;letter-spacing:0;color:var(--fg);margin:28px 0 6px}
+.page nav{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;margin-bottom:8px}
+.tiers{display:grid;gap:14px;margin:20px 0}
+.tier{padding:18px;border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
+.tier h3{margin:0 0 4px;font:700 20px var(--hfont)}
+.price{font:800 28px var(--font)}
+.tier ul{padding-left:18px;margin:10px 0 0}
+.tagline{font-weight:700;font-size:18px;margin:0 0 6px}
