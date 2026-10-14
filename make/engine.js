@@ -833,6 +833,142 @@ function drawBigCaption(ctx, t, p, D) {
   ctx.restore();
 }
 
+// ---------- 1c. HAND (meme format, Side Character POV): the object that houses "him" takes the room's applause as an insult ----------
+// 11 s, fixed: frame 0 (object + tag) -> the livestream on its dash phone (setup caption) -> HARD CUT to its hurt face + punch -> proud topper -> ease back,
+// hazard-clap, exact frame 0 held 9.0-11.0 (loop). The man is never shown: only the object, the stage as a dark room with clapping hands, and text.
+const HAND_D = 11.0, HAND_KINDS = {
+  car:    { body: "#E8D9B8", eyes: [[340, 880], [740, 880]], er: 62, mouth: [440, 962, 200, 52], face: [540, 900] },
+  bed:    { body: "#3F8F92", eyes: [[370, 905], [710, 905]], er: 72, mouth: [450, 1000, 180, 36], face: [540, 920] },
+  wallet: { body: "#6B4423", eyes: [[400, 850], [680, 850]], er: 58, mouth: [440, 975, 200, 44], face: [540, 900] },
+};
+const smooth01 = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
+function handState(t) { // the face over time: lid (0 open .. .6 slits), smile (-1 hurt .. 1 proud), lift px, quiver px, camera zoom
+  let lid = 0, smile = 0, lift = 0, quiver = 0, zoom = 1 + 0.03 * clamp(t / 1.5);
+  if (t >= 5.7 && t < 7.9) {
+    const a = t - 5.7, hurt = smooth01(a / 0.12), proud = smooth01((t - 6.9) / 0.18);
+    lid = 0.56 * hurt * (1 - proud) - 0.08 * proud; smile = -0.5 * hurt * (1 - proud) + 0.9 * proud; lift = 16 * proud;
+    quiver = a < 1.2 ? Math.sin(a * 80) * 3.5 * Math.max(0, 1 - a / 0.6) : 0; zoom = 1.45;
+  } else if (t >= 7.9 && t < 8.3) {
+    const e = smooth01((t - 7.9) / 0.4); lid = -0.08 * (1 - e); smile = 0.9 * (1 - e); lift = 16 * (1 - e); zoom = 1.45 + (1.03 - 1.45) * e;
+  } else if (t >= 8.3 && t < 9.0) zoom = 1.03;
+  else if (t >= 9.0) zoom = 1;
+  return { lid, smile, lift, quiver, zoom };
+}
+function handWorld(ctx, t) {
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#080B1C"); g.addColorStop(0.62, "#161D42"); g.addColorStop(1, "#0C1020");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#1B2547"; ctx.fillRect(0, 1130, W, 400);   // the lot
+  ctx.fillStyle = "#0E1530"; ctx.fillRect(560, 470, 460, 660);   // the convention centre: a glass box, lit
+  for (let r = 0; r < 7; r++) for (let c = 0; c < 6; c++) { ctx.fillStyle = (r * 7 + c * 3) % 5 === 0 ? "#3B4468" : "#F6D58A"; ctx.globalAlpha = 0.85; ctx.fillRect(580 + c * 72, 500 + r * 88, 52, 58); }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#9AA3C0"; ctx.fillRect(122, 640, 14, 500);   // the lot lamp
+  const gl = ctx.createRadialGradient(129, 650, 4, 129, 650, 330); gl.addColorStop(0, "rgba(255,236,170,.9)"); gl.addColorStop(1, "rgba(255,236,170,0)");
+  ctx.fillStyle = gl; ctx.fillRect(0, 300, 560, 700);
+  ctx.fillStyle = "#FFF3C4"; ctx.beginPath(); ctx.arc(129, 645, 20, 0, 7); ctx.fill();
+}
+function handObject(ctx, kind, t, st, blink, quietTime) {
+  const K = HAND_KINDS[kind] || HAND_KINDS.car, bob = Math.sin(quietTime * 5.7) * 3.2;
+  ctx.save(); ctx.translate(st.quiver, bob - st.lift);
+  const rr = (x, y, w, h, r, col) => { ctx.fillStyle = col; rrect(ctx, x, y, w, h, r); ctx.fill(); };
+  if (kind === "car") {
+    ctx.fillStyle = "#1B1B24"; for (const x of [300, 780]) { ctx.beginPath(); ctx.arc(x, 1070, 74, 0, 7); ctx.fill(); }
+    ctx.fillStyle = "#6E6E7C"; for (const x of [300, 780]) { ctx.beginPath(); ctx.arc(x, 1070, 30, 0, 7); ctx.fill(); }
+    ctx.fillStyle = "#D9C9A4"; ctx.beginPath(); ctx.moveTo(330, 600); ctx.lineTo(750, 600); ctx.lineTo(830, 790); ctx.lineTo(250, 790); ctx.closePath(); ctx.fill();   // cabin
+    ctx.fillStyle = "#26415C"; ctx.beginPath(); ctx.moveTo(362, 630); ctx.lineTo(718, 630); ctx.lineTo(782, 780); ctx.lineTo(298, 780); ctx.closePath(); ctx.fill();   // windshield
+    rr(380, 700, 170, 74, 30, "#8EC5FF");   // soft-blue pillow
+    rr(560, 712, 150, 62, 16, "#C9B79C");   // folded blanket
+    ctx.strokeStyle = "#F2F4F7"; ctx.lineWidth = 7; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(735, 745); ctx.lineTo(765, 700); ctx.stroke();   // toothbrush
+    const sw = Math.sin(quietTime * 2.2) * 6; ctx.strokeStyle = "#F5C242"; ctx.lineWidth = 5;   // the lanyard
+    ctx.beginPath(); ctx.moveTo(540, 632); ctx.lineTo(540 + sw, 690); ctx.stroke(); rr(520 + sw, 690, 44, 30, 5, "#FFFFFF");
+    const wa = quietTime > 0.5 && quietTime < 1.3 ? Math.sin((quietTime - 0.5) * Math.PI * 2.5) * 0.5 : 0;   // one wiper wag
+    ctx.strokeStyle = "#0B0F14"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(540, 778); ctx.lineTo(540 + Math.sin(wa) * 150, 778 - Math.cos(wa) * 140); ctx.stroke();
+    rr(200, 770, 680, 290, 64, K.body);
+    rr(210, 1030, 660, 44, 18, "#BFAF8A");
+    for (const x of [262, 818]) rr(x - 22, 800, 44, 26, 10, blink ? "#FFB020" : "#8A6A2A");   // hazards
+  } else if (kind === "bed") {
+    rr(250, 640, 580, 260, 24, "#7A5A3A"); rr(240, 1030, 50, 90, 8, "#5A3F28"); rr(790, 1030, 50, 90, 8, "#5A3F28");
+    rr(210, 860, 660, 210, 40, "#F0E6D2"); rr(210, 930, 660, 140, 36, K.body);
+    for (const x of [262, 818]) { ctx.fillStyle = "#5A3F28"; ctx.fillRect(x - 6, 780, 12, 90); rr(x - 34, 750, 68, 40, 12, blink ? "#FFD060" : "#B59A52"); }   // bedside lamps
+  } else {
+    for (const [x, c, r] of [[330, "#4C8BF5", -0.14], [530, "#E4572E", 0.04], [700, "#F2C14E", 0.18]]) { ctx.save(); ctx.translate(x, 740); ctx.rotate(r); rr(-90, -60, 180, 110, 12, c); ctx.restore(); }   // cards peeking out
+    rr(230, 770, 620, 340, 52, K.body); rr(230, 770, 620, 150, 52, "#563519");
+    ctx.strokeStyle = "rgba(255,220,160,.55)"; ctx.lineWidth = 4; ctx.setLineDash([16, 12]); ctx.strokeRect(262, 802, 556, 286); ctx.setLineDash([]);
+    ctx.fillStyle = "#E7B94B"; ctx.beginPath(); ctx.arc(540, 928, 26, 0, 7); ctx.fill();
+    for (const x of [262, 818]) { ctx.fillStyle = blink ? "#FFD060" : "#B59A52"; ctx.beginPath(); ctx.arc(x, 760, 22, 0, 7); ctx.fill(); }   // coins
+  }
+  // the face (same drawing for every object): eyes with lids in the body colour, a mouth that goes from a flat hurt line to a proud smile
+  const lidCol = K.body;
+  for (const [ex, ey] of K.eyes) {
+    ctx.save(); ctx.beginPath(); ctx.arc(ex, ey, K.er, 0, 7); ctx.clip();
+    ctx.fillStyle = "#FFFFFF"; ctx.fillRect(ex - K.er, ey - K.er, 2 * K.er, 2 * K.er);
+    ctx.fillStyle = "#12161F"; ctx.beginPath(); ctx.arc(ex + (st.smile > 0.3 ? 0 : 6), ey + (st.smile > 0.3 ? -8 : 10), K.er * 0.42, 0, 7); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(ex - 8, ey - 14, K.er * 0.11, 0, 7); ctx.fill();
+    if (st.lid > 0) {
+      const dy = st.lid * 2 * K.er, side = ex < 540 ? 1 : -1, sl = 0.5 * st.lid * K.er;   // inner corners higher = hurt
+      ctx.fillStyle = lidCol; ctx.beginPath(); ctx.moveTo(ex - K.er, ey - K.er - 2); ctx.lineTo(ex + K.er, ey - K.er - 2);
+      ctx.lineTo(ex + K.er, ey - K.er + dy - side * sl); ctx.lineTo(ex - K.er, ey - K.er + dy + side * sl); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+  const [mx, my, mw, mh] = K.mouth;
+  ctx.strokeStyle = "#1B1B24"; ctx.fillStyle = kind === "car" ? "#2A2630" : "#1D1A22"; ctx.lineWidth = 8; ctx.lineCap = "round";
+  if (st.smile > 0.15) { ctx.beginPath(); ctx.arc(mx + mw / 2, my - 12, mw / 2.1, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); }
+  else { rr(mx, my + (st.smile < -0.2 ? 6 : 0), mw, kind === "car" ? mh : mh * 0.7, 14, ctx.fillStyle);
+    if (kind === "car") { ctx.strokeStyle = "rgba(255,255,255,.18)"; ctx.lineWidth = 3; for (let i = 1; i < 5; i++) { ctx.beginPath(); ctx.moveTo(mx + (mw * i) / 5, my + 6); ctx.lineTo(mx + (mw * i) / 5, my + mh - 4); ctx.stroke(); } } }
+  ctx.restore();
+}
+function handStream(ctx, t, p) {
+  ctx.fillStyle = "#0A0C12"; ctx.fillRect(0, 0, W, H);
+  const k = t > 4.1 && t < 5.5 ? Math.sin((t - 4.1) * 1.2) * 0.04 : 0;   // the wheel creaks a few degrees as the car tenses
+  ctx.save(); ctx.translate(540, 1820); ctx.rotate(k); ctx.strokeStyle = "#1C202C"; ctx.lineWidth = 84; ctx.beginPath(); ctx.arc(0, 0, 470, 0, 7); ctx.stroke(); ctx.restore();
+  const r = SC.drawHudFrame(ctx, { x: 70, y: 400, w: 940, h: 700, screen: "#10131C" });
+  ctx.save(); ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, r.r); ctx.clip();
+  const cone = ctx.createLinearGradient(0, r.y, 0, r.y + r.h); cone.addColorStop(0, "rgba(255,255,255,.22)"); cone.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = cone; ctx.beginPath(); ctx.moveTo(500, r.y); ctx.lineTo(580, r.y); ctx.lineTo(760, r.y + 430); ctx.lineTo(320, r.y + 430); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#222838"; ctx.fillRect(r.x + 60, r.y + 430, r.w - 120, 36);   // the stage
+  ctx.strokeStyle = "#C7CCD9"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(540, r.y + 430); ctx.lineTo(540, r.y + 300); ctx.stroke();   // mic stand
+  ctx.fillStyle = (t > 1.5 && Math.floor(t * 2) % 2 === 0) || t > 2.8 ? "#FFB020" : "#8A6A2A"; rrect(ctx, 520, r.y + 258, 40, 62, 20); ctx.fill();   // the mic, glowing
+  const clap = t > 4.1 && t < 5.5;
+  for (let row = 0; row < 2; row++) for (let i = 0; i < 9; i++) {   // low-poly clapping hands, no faces
+    const x = r.x + 70 + i * 92 + (row ? 46 : 0), y = r.y + 560 + row * 70, a = clap ? Math.sin(t * 22 + i * 1.7 + row) * 0.45 : 0;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.fillStyle = "#F2B880"; ctx.beginPath(); ctx.ellipse(-12, 0, 14, 28, -0.3, 0, 7); ctx.fill();
+    ctx.fillStyle = "#E8A56A"; ctx.beginPath(); ctx.ellipse(12, 0, 14, 28, 0.3, 0, 7); ctx.fill(); ctx.restore();
+  }
+  ctx.fillStyle = "#E5333D"; rrect(ctx, r.x + 34, r.y + 30, 130, 52, 12); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.font = `400 34px Anton, "Noto Color Emoji", Impact, sans-serif`; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; ctx.fillText("● LIVE", r.x + 48, r.y + 68);
+  if ((t > 4.08 && t < 4.14) || (t > 4.22 && t < 4.28)) { ctx.fillStyle = "rgba(255,255,255,.14)"; ctx.fillRect(r.x, r.y, r.w, r.h); }   // glare flicker, local to the phone
+  ctx.restore();
+  const full = String(p.stage || "").trim();
+  if (full && t >= 2.8) {
+    const n = Math.min(full.length, Math.floor((t - 2.8) * 28)), shown = full.slice(0, n);
+    ctx.save(); ctx.fillStyle = "rgba(10,12,18,.88)"; ctx.fillRect(0, 1130, W, 250);
+    ctx.font = inter(60, 800); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillStyle = "#fff";
+    const lines = wrap(ctx, shown, 860).slice(0, 3); lines.forEach((l, i) => ctx.fillText(l, 540, 1198 + i * 70, 880)); ctx.restore();
+  }
+}
+function drawHand(ctx, t, p, D) {
+  const kind = HAND_KINDS[p.object] ? p.object : "car", tt = t >= 9.0 ? 0 : t;   // 9.0-11.0 = EXACT frame-0 state (loop)
+  const stream = tt >= 1.5 && tt < 5.7;
+  if (stream) handStream(ctx, tt, p);
+  else {
+    const st = handState(tt), blink = tt >= 7.9 && tt < 9.0 && Math.sin((tt - 7.9) * Math.PI * 3) > 0;
+    const z = st.zoom * 1.18, cy = 900 - (st.zoom - 1) * 250;   // frame 0: the object fills ~70% of the width
+    ctx.save(); ctx.translate(540, cy); ctx.scale(z, z); ctx.translate(-540, -940);
+    handWorld(ctx, tt); handObject(ctx, kind, tt, st, blink, tt);
+    ctx.restore();
+    if (tt >= 5.7 && tt < 7.9) {
+      const a = tt - 5.7, k = easeBack(a / 0.14), lines = rows(p.punch).slice(0, 2);
+      ctx.save(); ctx.translate(540, 1100); ctx.scale(0.8 + 0.2 * k, 0.8 + 0.2 * k); ctx.translate(-540, -1100); ctx.globalAlpha = clamp(a / 0.08);
+      let y = 1010; lines.forEach((l) => { y = SC.drawTopText(ctx, l, { y, size: 96, maxLines: 1 }); }); ctx.restore();
+      if (tt >= 6.9 && String(p.topper || "").trim()) {
+        const b = easeBack((tt - 6.9) / 0.14); ctx.save(); ctx.translate(540, 1330); ctx.scale(0.8 + 0.2 * b, 0.8 + 0.2 * b); ctx.translate(-540, -1330);
+        SC.drawTopText(ctx, p.topper, { y: 1285, size: 72, maxLines: 1 }); ctx.restore();
+      }
+    }
+  }
+  SC.drawPovTag(ctx, String(p.tag || "HAND #1: you're his car"));
+}
+
 const dur = (base, per, count, min = 12, max = 45) => clamp(base + per * count, min, max);
 export const END_CARD_S = 1.5;
 export const TEMPLATES = [
@@ -871,6 +1007,16 @@ export const TEMPLATES = [
     duration: chatDuration, draw: drawPovChat, bg: (ctx, t, p) => chatScene(ctx, t, p.scene),
     cues: (p) => { const ms = parseChat(p), ts = chatTimes(ms);
       return ms.map((m, i) => ({ t: ts[i], k: m.me ? "send" : "recv", i, last: i === ms.length - 1 })); } },
+  { id: "hand", name: "Give him a big hand (meme)", brand: "sidecharpov", pro: false, blurb: "The meme format: the object that houses \"him\" hears the room applaud and takes it personally. Pick the object, type the punch and the topper.",
+    fields: [
+      { key: "tag", label: "Tag: HAND #n, then what you are to him (his car, his bed, his wallet...)", type: "text", def: "HAND #1: you're his car" },
+      { key: "object", label: "The object (it's on his side)", type: "select", def: "car", options: [["car", "Car"], ["bed", "Bed"], ["wallet", "Wallet"]] },
+      { key: "stage", label: "The line from the room (the meme's setup; keep it short and don't add insults)", type: "text", def: "\"Give him a big hand, guys. Homeless dude.\"" },
+      { key: "punch", label: "Your object defends him: it's on his side (2 short lines)", type: "textarea", def: "HE'S NOT HOMELESS.\nHE HAS ME." },
+      { key: "topper", label: "What it proudly gives him (a warm brag, ~4 words)", type: "text", def: "I HAVE HEATED SEATS." },
+    ],
+    duration: () => HAND_D, draw: drawHand, bg: (ctx, t) => handWorld(ctx, 0),
+    cues: () => [{ t: 1.5, k: "cut" }, { t: 4.1, k: "applause" }, { t: 5.7, k: "punch" }, { t: 6.9, k: "topper" }, { t: 7.9, k: "hazard" }] },
   { id: "notif-stack", name: "Notification Stack", brand: "sidecharpov", pro: true, blurb: "Lock-screen notifications pile up. Pure chaos.",
     fields: [
       { key: "pov", label: "POV tag", type: "text", def: "POV: your phone at 3 a.m." },
@@ -954,6 +1100,9 @@ export const DEMOS = {
     tag: "Ants x2 every second", rule: "Rule: 1 ant, doubles every second", episode: "015", hero: "ladder", ladder: "ants", endWord: "Earth's ants",
     ease: "linear", int: "floor", speedUnit: "doublings", len: "20", tail: "1.5",
     stages: "One ant. It doubles every second. @3\nPast 1,000 ants: a spoonful. @4.2\nPast 50,000: a coffee mug. @5.4\nPast a million: a small bucket. @7\nPast 30 million: a wheelie bin. @8.7\nPast a billion: a garden shed. @10.3\nPast 10 billion: a living room. @11.4\nPast 100 billion: a house. @12.6\nPast a trillion: over six storeys. @13.7\nPast 10 trillion: a 13-storey block. @15.1\nTaller than the Great Pyramid. @16.8\nAbout every ant on Earth: taller than the Empire State. @18.5" } },
+  hand: { t: "hand", name: "Give him a big hand: you're his car", p: {} },
+  // HAND #2 copy from shared/scripts/2026-10-15-b5-big-hand-2-the-bed.md. HELD until HAND #2 has posted (Muse: the demo would spoil the post).
+  handbed: { hold: true, t: "hand", name: "Give him a big hand: you're the empty bed", p: { tag: "HAND #2: you're the empty bed", object: "bed", punch: "BIG HAND?\nI'M KING SIZE.", topper: "I HAVE A MINT." } },
   moon3d: { t: "whatif-3d", name: "Moon 1 km closer (3D)", p: {} },
   sleep: { t: "day-timeline", name: "Nobody slept for a week", p: {} },
   phone3am: { t: "notif-stack", name: "Your phone at 3 a.m.", p: {} },

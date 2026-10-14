@@ -138,6 +138,18 @@ const BEDS = {
     const hit = cues.find((c) => c.k === "hit")?.t ?? last?.t; // contact = the payoff
     if (last && hit != null) { const r0 = Math.max(hold + 0.6, hit - 1.4); m.riser(r0, hit - 0.02, 0.34); m.boom(hit, 1.0); m.pad(hit, D + (endCard ? 1.3 : 0.3), [45, 52, 57, 64], 0.2, 0.3); }
   },
+  hand(m, cues, D, endCard) {   // the lot at night: idle hum + crickets, a dead-quiet beat, a wounded horn, a smug double chirp, hazard ticks
+    const T = (k) => cues.find((c) => c.k === k)?.t, end = D + (endCard ? 1.4 : 0.3);
+    m.drone(0, D, () => 0.2, 50);
+    for (let t = 0.3; t < D; t += 0.43) m.tick(t, 4200 + 300 * Math.sin(t * 9), 0.025);   // crickets
+    m.boom(T("cut") ?? 1.5, 0.3);
+    for (let t = T("applause") ?? 4.1; t < 5.5; t += 0.045) m.hat(t, 0.07 + 0.05 * Math.sin(t * 40));   // synth-noise claps
+    m.bell(4.3, 1320, 0.12);
+    const p = T("punch") ?? 5.7; m.sweep(p, 0.32, 190, 150, 0.45, 6, { tri: 1 });
+    const q = T("topper") ?? 6.9; m.blip(q, 1500, 0.2); m.blip(q + 0.14, 1900, 0.2);
+    for (let t = T("hazard") ?? 7.9; t < 9.0; t += 1 / 3) m.tick(t, 2300, 0.14);
+    m.pad(0, end, [41, 48, 53], 0.06, 0.6);
+  },
   "pov-chat"(m, cues, D, endCard) {
     const msgs = cues.filter((c) => c.k === "send" || c.k === "recv"), end = D + (endCard ? 1.4 : 0.3);
     m.pad(0, end, [48, 55, 59, 64], 0.2, 0.7);       // C3 G3 B3 E4 : warm, a little wistful
