@@ -34,6 +34,31 @@ function simSpan(s) { // "7 H", "3 M", "2 D", "11 Y": the nearest whole unit
 const epi = (p) => "SIM #" + String(p.episode || "001").padStart(3, "0");
 function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
 
+// Caption in the brand slot (same look as the kit's drawCaption: Space Grotesk 62 -> 50, two soft shadows) with a BALANCED wrap:
+// when it needs two lines, split at the word boundary nearest half the text width, so there is never a one-word last line.
+function captionBal(ctx, text, { x = 502, y = 1262, maxW = 840, size = 62, minSize = 50, maxLines = 2 } = {}) {
+  text = String(text || "").trim(); if (!text) return y;
+  ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillStyle = "#FFFFFF";
+  let sz = size, lines = [];
+  for (; sz >= minSize; sz -= 2) { ctx.font = grot(sz); track(ctx, -0.005 * sz); lines = wrap(ctx, text, maxW); if (lines.length <= maxLines) break; }
+  if (lines.length === 2) {
+    const w = text.split(/\s+/); let best = null, bd = 1e9;
+    for (let i = 1; i < w.length; i++) {
+      const a = w.slice(0, i).join(" "), b = w.slice(i).join(" "), wa = ctx.measureText(a).width, wb = ctx.measureText(b).width;
+      if (wa <= maxW && wb <= maxW && Math.abs(wa - wb) < bd) { bd = Math.abs(wa - wb); best = [a, b]; }
+    }
+    if (best) lines = best;
+  }
+  lines = lines.slice(0, maxLines);
+  const lh = 1.12 * sz;
+  for (const [blur, oy, a] of [[28, 4, 0.85], [4, 2, 0.7]]) {
+    ctx.shadowColor = `rgba(0,0,0,${a})`; ctx.shadowBlur = blur; ctx.shadowOffsetY = oy;
+    lines.forEach((l, i) => ctx.fillText(l, x, y + 0.84 * sz + i * lh, maxW));
+  }
+  ctx.restore();
+  return y + lines.length * lh;
+}
+
 // ---------- Ran The Sim look: grid background + HUD brackets ----------
 function simBg(ctx, t) {
   ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H);
@@ -152,7 +177,7 @@ function drawWhatIfSim(ctx, t, p, D) {
     }
     const k = easeBack(sT / 0.25);
     ctx.save(); ctx.globalAlpha = clamp(sT / 0.15); ctx.translate(0, (1 - k) * 30);
-    RTS.drawCaption(ctx, stages[si] || "", { y: 1262, maxLines: 2 });
+    captionBal(ctx, stages[si] || "", { y: 1262 });
     ctx.restore();
     ctx.fillStyle = P.line; ctx.fillRect(TB.x0, 1240, TW, 6);
     ctx.fillStyle = contact ? P.alert : P.amber; ctx.fillRect(TB.x0, 1240, TW * u, 6);
@@ -169,17 +194,19 @@ let G3 = null;
 export const set3D = (m) => { G3 = m; };
 export const get3D = () => G3;
 export const set3DRes = (h) => { if (G3 && !G3.lost) G3.setRes(h); };
-const HOLD3 = 3.5, RULE_S = 1.8, SURGE = 0.4, K3 = 20.6, R0_3 = 23.3; // premise hold; rule caption at the cut; contact surge; Moon grows x20.6 (R 23 -> 480 px = 89% of the frame width)
+const HOLD3 = 3.5, RULE_S = 1.8, SURGE = 2.0, K3 = 20.6, R0_3 = 23.3; // premise hold; rule caption at the cut; contact surge; Moon grows x20.6 (R 23 -> 480 px = 89% of the frame width)
 const smoothstep = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
 // Everything the scene shows is a function of u (run progress): the Moon's size follows the true 1/d law because the
 // counter itself is d(t) = end + (start - end) / K^u, so the pixels and the number can never disagree.
 function law3(t, p, D) {
   const tEnd = D - TAIL, tRun = tEnd - SURGE, u = clamp(t / tRun);
   const a = num(p.start, 0), b = num(p.end, 0);
-  const e = Math.pow(u, 0.88), s = clamp((t - tRun) / SURGE), f = Math.pow(K3, -e) * (1 - smoothstep(s));   // e: early growth a touch faster
-  const v = b + (a - b) * f, R = R0_3 * Math.pow(K3, e), R75 = R0_3 * Math.pow(K3, Math.pow(0.75, 0.88));
-  return { tEnd, u, v, R, moonY: 1050 - 145 * smoothstep(u), horizon: 1350 + 70 * smoothstep(u),
-    tide: Math.min(0.9, 0.5 * Math.pow(R / R75, 3)), bright: u, starK: 1 - 0.8 * smoothstep((u - 0.5) / 0.45), contact: t >= tEnd };
+  const e = Math.pow(u, 0.88), s = clamp((t - tRun) / SURGE);                     // e: early growth a touch faster
+  const f = Math.pow(K3, -e) * (1 - s);                                           // last ~2 s: the remaining distance runs down to 0 continuously
+  const v = b + (a - b) * f, Rrun = R0_3 * Math.pow(K3, e), R75 = R0_3 * Math.pow(K3, Math.pow(0.75, 0.88));
+  const R = Rrun * (1 + 0.38 * smoothstep(s));                                    // the Moon keeps ballooning until its limb leaves the frame (>= 110% of width)
+  return { tEnd, u, s, v, R, moonY: 1050 - 145 * smoothstep(u) - 160 * smoothstep(s), horizon: 1350 + 70 * smoothstep(Math.min(1, u / 0.85)),
+    tide: Math.min(0.9, 0.5 * Math.pow(Rrun / R75, 3)), bright: u, starK: 1 - 0.8 * smoothstep((u - 0.5) / 0.45), contact: t >= tEnd };
 }
 const dual = (v, unit) => {
   const u = String(unit || "").trim().toLowerCase(), n = Math.abs(v);
@@ -259,8 +286,8 @@ function drawWhatIf3D(ctx, t, p, D) {
     const bt = premiseScene(ctx, t, p.premise);
     RTS.drawCounter(ctx, fmt(L.v), { y: bt + 14, size: 96, unit, label: "" });
   } else {
-    const g = ctx.createLinearGradient(0, 0, 0, 700); g.addColorStop(0, "rgba(10,14,20,.42)"); g.addColorStop(1, "rgba(10,14,20,0)");
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, 700);
+    const g = ctx.createLinearGradient(0, 0, 0, 700); g.addColorStop(0, `rgba(10,14,20,${(0.42 + 0.3 * smoothstep((L.R - 300) / 360)).toFixed(3)})`); g.addColorStop(1, "rgba(10,14,20,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, 760);
     const bt = RTS.drawCounter(ctx, fmt(L.v), { y: 236, size: 120, unit, units2: dual(L.v, unit),
       desc: contact ? "CONTACT" : String(p.label || "").trim(), color });
     const a = num(p.start, 0), rate = Math.max(1e-9, num(p.rate, 1)), simS = Math.abs(L.v - a) / rate;
@@ -268,10 +295,10 @@ function drawWhatIf3D(ctx, t, p, D) {
     ctx.save(); ctx.font = mono(24); track(ctx, 1.2); ctx.fillStyle = "rgba(242,244,247,.78)"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
     ctx.shadowColor = "rgba(10,14,20,.7)"; ctx.shadowBlur = 8;
     ctx.fillText(`${simClock(simS)}  ·  ▶▶ 1 S ≈ ${simSpan(per)}`, 64, bt + 24, 876); ctx.restore();
-    const cap = si < 0 ? String(p.rule || "").trim() : stages[si] || "";
+    const cap = si < 0 ? String(p.rule || "").trim() : (contact && String(p.payoff || "").trim() ? String(p.payoff).trim() : stages[si] || "");
     const k = si < 0 ? 1 : easeBack(sT / 0.25);
     ctx.save(); ctx.globalAlpha = si < 0 ? 1 : clamp(sT / 0.15); ctx.translate(0, (1 - k) * 30);
-    RTS.drawCaption(ctx, cap, { y: 1262, maxLines: 2 });
+    captionBal(ctx, cap, { y: 1262 });
     ctx.restore();
     if (hit && sT < 1 / 30 && !contact && si >= 0) { ctx.fillStyle = "rgba(255,255,255,.45)"; ctx.fillRect(0, 0, W, H); }
   }
@@ -516,6 +543,7 @@ TEMPLATES.push({ id: "whatif-3d", name: "What If · Night Sky (3D)", brand: "ran
     ...SIM.fields.filter((f) => ["label", "unit", "start", "end", "rate"].includes(f.key)),
     { key: "rule", label: "Rule line (shows ~2 s at the start; optional)", type: "text", def: "Rule: 1 km/s · not real orbital physics" },
     SIM.fields.find((f) => f.key === "stages"),
+    { key: "payoff", label: "Payoff line (shows at contact)", type: "text", def: "Hello, Moon." },
   ],
   duration: (p) => dur(HOLD3 + (String(p.rule || "").trim() ? RULE_S : 0) + TAIL, 3.2, rows(p.stages).length, 8, 45),
   draw: drawWhatIf3D,
