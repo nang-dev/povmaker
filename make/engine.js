@@ -19,15 +19,18 @@ const clock = (t) => `T+${String(Math.floor(t / 60)).padStart(2, "0")}:${String(
 function simClock(s) {
   s = Math.max(0, Math.round(s));
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  if (d >= 3650) return `T+${(s / 31557600).toFixed(s / 31557600 < 100 ? 1 : 0)} YR`;   // 10+ years: keeps the HUD tag row legible
+  if (d >= 1000) return `T+${d.toLocaleString("en-US")} D`;
   if (d) return `T+${d}D ${String(h).padStart(2, "0")}H ${String(m).padStart(2, "0")}M`;
   if (h) return `T+${h}H ${String(m).padStart(2, "0")}M`;
   return clock(s);
 }
-function simSpan(s) { // "7 H", "3 M", "2 D": the nearest whole unit
-  const u = s >= 86400 * 1.5 ? [86400, "D"] : s >= 3600 * 1.5 ? [3600, "H"] : s >= 90 ? [60, "M"] : [1, "S"];
+function simSpan(s) { // "7 H", "3 M", "2 D", "11 Y": the nearest whole unit
+  const u = s >= 31557600 * 1.5 ? [31557600, "Y"] : s >= 86400 * 1.5 ? [86400, "D"] : s >= 3600 * 1.5 ? [3600, "H"] : s >= 90 ? [60, "M"] : [1, "S"];
   const v = Math.max(1, Math.round(s / u[0]));
   return `${v} ${u[1]}`;
 }
+
 const epi = (p) => "SIM #" + String(p.episode || "001").padStart(3, "0");
 function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
 
@@ -461,7 +464,7 @@ export const TEMPLATES = [
       { key: "stages", label: "Captions, one per beat (one per line)", type: "textarea", def: "Tides start to climb\nCoastlines go under at dawn\nThe sky is mostly Moon\nIt doesn't stop." },
       { key: "episode", label: "Sim number", type: "text", def: "001" },
     ],
-    duration: (p) => dur(HOLD + TAIL, 3.2, rows(p.stages).length, 8, 45), draw: drawWhatIfSim, bg: (ctx, t) => simBg(ctx, t),
+    duration: (p) => { const n = rows(p.stages).length; return dur(HOLD + TAIL, n <= 4 ? 3.2 : Math.max(2.6, Math.min(3.2, 15.5 / n)), n, 8, 45); }, draw: drawWhatIfSim, bg: (ctx, t) => simBg(ctx, t),
     cues: (p, D) => { const n = Math.max(1, rows(p.stages).length), st = (D - HOLD - TAIL) / n;
       return [{ t: HOLD, k: "exit" }, ...Array.from({ length: n }, (_, i) => ({ t: HOLD + i * st, k: "stage", i })), { t: D - TAIL, k: "hit" }]; } },
   { id: "day-timeline", name: "Day 1 → Day 10,000", brand: "ranthesim", pro: false, blurb: "A timeline that escalates, one beat at a time.",
@@ -523,6 +526,23 @@ TEMPLATES.push({ id: "whatif-3d", name: "What If · Night Sky (3D)", brand: "ran
 export const DEMOS = {
   goose: { t: "pov-chat", name: "Goose vs. jogger", p: {} },
   moon: { t: "whatif-sim", name: "Moon 1 km closer every second", p: {} },
+  // whatif-sim remix presets from the QA-passed scripts (Atlas, shared/whatif/povmaker-presets.md). Loaded exactly as given.
+  commute: { t: "whatif-sim", name: "Your commute went straight up", p: {
+    premise: "Your commute went\nstraight up?", label: "Distance to the Sun", unit: "km", start: "149600000", end: "0", rate: "0.0277778",
+    tag: "Commute, straight up", rule: "Rule: 100 km/h, straight up · not rocket science", episode: "004",
+    stages: "Same speed. Different direction.\nPast the Moon's orbit.\nStill 100 km/h. Still going.\nPast Mars at its closest.\n171 years to the Sun. At 100 km/h." } },
+  birthday: { t: "whatif-sim", name: "Strangers walked in until two shared a birthday", p: {
+    premise: "Strangers walked in until\ntwo shared a birthday?", label: "In the room", unit: "people", start: "0", end: "23", rate: "1",
+    tag: "Birthday room", rule: "Rule: 365 days, no Feb 29", episode: "008",
+    stages: "One stranger per second.\nEach one meets everyone.\nPerson 5: a 2.7% chance.\nPerson 9: nearly 10%.\nPerson 23: over 50%. A coin flip." } },
+  carrington: { t: "whatif-sim", name: "The 1859 solar storm lit up your sky", p: {
+    premise: "The 1859 solar storm\nlit up your sky\ntonight?", label: "Cloud distance to Earth", unit: "km", start: "149600000", end: "0", rate: "2361.11",
+    tag: "1859 storm, tonight", rule: "Rule: 1859 timeline, replayed tonight", episode: "009",
+    stages: "Light arrives: 8 minutes 19 seconds.\nNormal cloud: 3.5 days. This: 17.6 hours.\nPolar flights get rerouted.\nPast Mercury's orbit.\nImpact: 17.6 hours after the flare." } },
+  oxygen: { t: "whatif-sim", name: "Earth lost 1% of its oxygen every second", p: {
+    premise: "Earth lost 1% of its\noxygen every second?", label: "Oxygen left", unit: "%", start: "100", end: "0", rate: "1",
+    tag: "Earth loses 1% O2/s", rule: "Rule: 1% per second · not real chemistry", episode: "006",
+    stages: "Oxygen: 1% gone every second.\nFull to zero in 100 seconds.\nDenver's air. Barely noticeable.\nCandle's out. Air: ~16% oxygen.\nGas flames die. Air: 12% oxygen." } },
   moon3d: { t: "whatif-3d", name: "Moon 1 km closer (3D)", p: {} },
   sleep: { t: "day-timeline", name: "Nobody slept for a week", p: {} },
   phone3am: { t: "notif-stack", name: "Your phone at 3 a.m.", p: {} },
