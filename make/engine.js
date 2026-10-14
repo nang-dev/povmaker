@@ -292,12 +292,16 @@ function heroClock(ctx, t, HR, cam) { // "sleepless": a 24 h dial that laps, a c
   g.strokeStyle = P.amber; g.lineWidth = 12; g.lineCap = "round"; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(ang) * (R - 38), cy + Math.sin(ang) * (R - 38)); g.stroke();
   g.fillStyle = P.amber; g.beginPath(); g.arc(cx + Math.cos(ang) * (R - 38), cy + Math.sin(ang) * (R - 38), 22, 0, 7); g.fill();
   g.fillStyle = "#0B0F14"; g.beginPath(); g.arc(cx, cy, 15, 0, 7); g.fill();
-  g.fillStyle = P.text; g.font = mono(54); g.fillText(`${hr % 12 || 12}:00 ${hr < 12 ? "AM" : "PM"}`, cx, cy + 92);
-  g.fillStyle = P.cyan; g.font = mono(32); g.fillText(`DAY ${day}`, cx, cy + R + 88);
+  g.font = mono(40); g.fillStyle = P.text; const tm = `${hr % 12 || 12}:00 ${hr < 12 ? "AM" : "PM"}`, dl = `DAY ${day}`;
+  const tw = g.measureText(tm + "  ·  ").width, dw = g.measureText(dl).width, x0 = cx - (tw + dw) / 2;
+  g.textAlign = "left"; g.fillText(tm, x0, cy + R + 84); g.fillStyle = P.cyan; g.fillText("  ·  " + dl, x0 + g.measureText(tm).width, cy + R + 84); g.textAlign = "center";
   const cups = Math.min(12, day);   // the cup tower: one cup per day awake
   for (let i = 0; i < cups; i++) {
     const sway = Math.sin(t * 2.1 + i * 0.55) * wob * (2 + i * 1.6), y = 1196 - (i + 1) * 40;
-    g.fillStyle = i % 2 ? "#E8EEF3" : "#C9D2DC"; g.beginPath(); g.moveTo(790 + sway - 50, y); g.lineTo(790 + sway + 50, y); g.lineTo(790 + sway + 40, y + 36); g.lineTo(790 + sway - 40, y + 36); g.closePath(); g.fill();
+    const mx = 850 + sway;   // a coffee mug: body, handle, brown coffee on top
+    g.strokeStyle = "#E8EEF3"; g.lineWidth = 7; g.beginPath(); g.arc(mx + 48, y + 18, 11, -1.5, 1.5); g.stroke();
+    g.fillStyle = i % 2 ? "#E8EEF3" : "#C9D2DC"; g.beginPath(); g.moveTo(mx - 46, y + 2); g.lineTo(mx + 46, y + 2); g.lineTo(mx + 38, y + 36); g.lineTo(mx - 38, y + 36); g.closePath(); g.fill();
+    g.fillStyle = "#4B2E1E"; g.beginPath(); g.ellipse(mx, y + 3, 44, 6, 0, 0, 7); g.fill();
   }
   if (HR >= 17 && HR < 28) {   // performance equivalence, shown only inside the studied range (up to 28 h awake)
     const chip = HR < 24 ? "PERFORMS LIKE 0.05% BAC" : "PERFORMS LIKE 0.10% BAC";
@@ -313,12 +317,178 @@ function heroClock(ctx, t, HR, cam) { // "sleepless": a 24 h dial that laps, a c
     ctx.restore();
   }
 }
+function heroFrost(ctx, t, w, cam) { // "cools": Earth with continents; frost grows ON the disc (polar caps toward the equator, oceans whiten, land frosts); the Sun stays
+  const cx = 540, cy = 960, R = 170, c = (a, b, x) => `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * x)).join(",")})`;
+  const oc = clamp((w - 0.1) / 0.5), lc = clamp((w - 0.22) / 0.45), cap = clamp((w - 0.02) / 0.62), z = clamp((w - 0.88) / 0.12);
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(cam, cam); ctx.translate(-cx, -cy);
+  ctx.strokeStyle = "rgba(61,214,245,.16)"; ctx.lineWidth = 2;
+  for (const r of [250, 340, 430]) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke(); }
+  const sunG = ctx.createRadialGradient(205, 790, 6, 205, 790, 120);   // the Sun, fixed top-left, never goes out
+  sunG.addColorStop(0, "rgba(255,226,160,1)"); sunG.addColorStop(0.3, "rgba(255,176,32,.9)"); sunG.addColorStop(1, "rgba(255,176,32,0)");
+  ctx.fillStyle = sunG; ctx.beginPath(); ctx.arc(205, 790, 120, 0, 7); ctx.fill();
+  const halo = ctx.createRadialGradient(cx, cy, R, cx, cy, R + 110); halo.addColorStop(0, `rgba(190,233,247,${(0.18 + 0.5 * w).toFixed(3)})`); halo.addColorStop(1, "rgba(190,233,247,0)");
+  ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(cx, cy, R + 110, 0, 7); ctx.fill();
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.clip();
+  ctx.fillStyle = c([47, 125, 184], [232, 243, 250], oc); ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+  const land = c([72, 150, 74], [238, 247, 251], lc);
+  ctx.fillStyle = land; ctx.strokeStyle = land; ctx.lineWidth = 14; ctx.lineJoin = "round";
+  for (const poly of [
+    [[-.62, -.5], [-.3, -.62], [-.1, -.42], [-.3, -.2], [-.18, .02], [-.02, .2], [-.12, .5], [-.26, .78], [-.4, .45], [-.36, .1], [-.58, -.08], [-.72, -.28]],   // the Americas
+    [[.12, -.5], [.42, -.58], [.68, -.36], [.56, -.1], [.72, .2], [.5, .56], [.3, .62], [.24, .26], [.1, 0], [.2, -.22]],                                    // Europe + Africa
+    [[.5, -.62], [.8, -.5], [.9, -.2], [.72, -.18], [.58, -.3]]]) {                                                                                           // Asia
+    ctx.beginPath(); poly.forEach(([x, y], i) => ctx[i ? "lineTo" : "moveTo"](cx + x * R, cy + y * R)); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(246,252,255,.96)";   // polar caps creep toward the equator
+  const hh = R * (0.1 + 1.45 * Math.pow(cap, 0.85));
+  ctx.beginPath(); ctx.ellipse(cx, cy - R, R * 1.3, hh, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx, cy + R, R * 1.3, hh * 0.9, 0, 0, 7); ctx.fill();
+  const sh = ctx.createRadialGradient(cx - 50, cy - 50, R * 0.2, cx, cy, R * 1.05); sh.addColorStop(0, "rgba(0,0,0,0)"); sh.addColorStop(1, "rgba(5,10,20,.42)");
+  ctx.fillStyle = sh; ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+  ctx.restore();
+  ctx.strokeStyle = `rgba(200,236,250,${(0.25 + 0.55 * w).toFixed(2)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, R + 2, 0, 7); ctx.stroke();   // icy rim
+  if (w > 0.55) {   // diamond dust
+    const m = clamp((w - 0.55) / 0.3);
+    for (let i = 0; i < 40; i++) { const a = i * 2.4 + t * 0.2, rr = 215 + ((i * 53) % 200), tw = 0.5 + 0.5 * Math.sin(t * 5 + i); ctx.fillStyle = `rgba(230,246,255,${(0.7 * m * tw).toFixed(2)})`; ctx.fillRect(cx + Math.cos(a) * rr - 3, cy + Math.sin(a) * rr * 0.9 - 3, 6, 6); }
+  }
+  if (z > 0) {   // the air itself condenses: a bright shell around the white disc
+    ctx.save(); ctx.shadowColor = "rgba(120,220,255,.9)"; ctx.shadowBlur = 30 * z;
+    ctx.strokeStyle = `rgba(255,255,255,${(0.95 * z).toFixed(2)})`; ctx.lineWidth = 12 + 16 * z; ctx.beginPath(); ctx.arc(cx, cy, R + 20, 0, 7); ctx.stroke(); ctx.restore();
+  }
+  ctx.restore();
+}
+// ---- "ladder": the thing that doubles is DRAWN (a paper stack / an ant cube) standing beside the silhouette of the next real landmark it is
+// about to pass, at true relative scale; the camera zooms out so the object stays big and each passed landmark shrinks away to the left ----
+const fmtH = (m) => {
+  if (m < 0.01) return `${+(m * 1000).toFixed(1)} MM`;
+  if (m < 1) return m < 0.1 ? `${+(m * 100).toFixed(1)} CM` : `${Math.round(m * 100)} CM`;
+  if (m < 1000) return `${+m.toFixed(m < 10 ? 1 : 0)} M`;
+  const k = m / 1000; return `${k < 100 ? +k.toFixed(1) : Math.round(k).toLocaleString("en-US")} KM`;
+};
+function lenFmt(m) { // exact readout of the growing thing
+  if (m < 0.01) return `${(m * 1000).toFixed(1)} MM`;
+  if (m < 1) return m < 0.1 ? `${(m * 100).toFixed(1)} CM` : `${Math.round(m * 100)} CM`;
+  if (m < 1000) return `${m < 100 ? m.toFixed(1) : Math.round(m)} M`;
+  const k = m / 1000; return `${k < 100 ? k.toFixed(1) : Math.round(k).toLocaleString("en-US")} KM`;
+}
+function antFmt(c) {
+  if (c < 1e6) return Math.round(c).toLocaleString("en-US");
+  for (const [d, w] of [[1e15, "QUADRILLION"], [1e12, "TRILLION"], [1e9, "BILLION"], [1e6, "MILLION"]]) if (c >= d) { const x = c / d; return `${x < 100 ? x.toFixed(x < 10 ? 1 : 0) : Math.round(x)} ${w}`; }
+  return String(c);
+}
+// [height m, silhouette kind, aspect w/h, label]. Heights are the landmark's own size; kind "line" = a horizontal level, "disc" = a round body.
+const SCALE_SETS = {
+  fold: { obj: (n) => 1e-4 * Math.pow(2, n), read: (n) => [["THICKNESS", lenFmt(1e-4 * Math.pow(2, n))]], objAs: "stack",
+    marks: [[0.0003, "slab", 1.4, "Playing card"], [0.002, "slab", 6, "Coin"], [0.008, "slab", 0.5, "Phone"], [0.03, "slab", 0.7, "Book"], [0.1, "mug", 0.95, "Mug"], [2, "door", 0.42, "Door"],
+      [10, "house", 1.4, "House"], [93, "statue", 0.35, "Statue of Liberty"], [330, "eiffel", 0.5, "Eiffel Tower"], [828, "burj", 0.12, "Burj Khalifa"], [8849, "peak", 1.5, "Everest"],
+      [1e5, "line", 0, "Edge of space"], [4.08e5, "iss", 0, "Space Station"], [1.2742e7, "disc", 1, "Earth, 12,742 km wide"], [3.5786e7, "line", 0, "Geo orbit"], [3.844e8, "orbit", 0, "Moon, 384,400 km away"]] },
+  ants: { obj: (n) => Math.cbrt(Math.pow(2, n) * 6.64e-9), read: (n) => [["ANTS", antFmt(Math.pow(2, n))], ["CUBE SIDE", lenFmt(Math.cbrt(Math.pow(2, n) * 6.64e-9))]], objAs: "cube",
+    marks: [[0.006, "slab", 1.6, "Grain of rice"], [0.04, "spoon", 1.4, "Teaspoon"], [0.1, "mug", 0.95, "Coffee mug"], [0.28, "bucket", 1, "Bucket"], [1.1, "bin", 0.7, "Wheelie bin"],
+      [2.4, "shed", 1.3, "Garden shed"], [9, "house", 1.4, "House"], [40, "block", 0.5, "13-storey block"], [96, "bigben", 0.14, "Big Ben"], [146.6, "pyramid", 1.55, "Great Pyramid"], [443, "esb", 0.28, "Empire State"]] },
+};
+function silhouette(c, kind, x, gy, h, w, col) { // x = left edge, gy = ground y, h/w px
+  c.fillStyle = col; c.strokeStyle = col;
+  const R = (a, b, cw, ch) => c.fillRect(x + a * w, gy - (b + ch) * h, cw * w, ch * h);
+  switch (kind) {
+    case "slab": c.fillRect(x, gy - h, w, h); break;
+    case "mug": R(0, 0, 0.78, 1); c.lineWidth = Math.max(1, h * 0.12); c.beginPath(); c.arc(x + w * 0.78, gy - h * 0.5, h * 0.28, -1.5, 1.5); c.stroke(); break;
+    case "door": R(0, 0, 1, 1); c.fillStyle = "#0B0F14"; c.beginPath(); c.arc(x + w * 0.8, gy - h * 0.48, Math.max(1, h * 0.025), 0, 7); c.fill(); break;
+    case "house": R(0, 0, 1, 0.62); c.beginPath(); c.moveTo(x - w * 0.06, gy - h * 0.62); c.lineTo(x + w * 0.5, gy - h); c.lineTo(x + w * 1.06, gy - h * 0.62); c.closePath(); c.fill(); break;
+    case "shed": R(0, 0, 1, 0.7); c.beginPath(); c.moveTo(x - w * 0.05, gy - h * 0.7); c.lineTo(x + w * 0.5, gy - h); c.lineTo(x + w * 1.05, gy - h * 0.7); c.closePath(); c.fill(); break;
+    case "bucket": c.beginPath(); c.moveTo(x, gy - h); c.lineTo(x + w, gy - h); c.lineTo(x + w * 0.82, gy); c.lineTo(x + w * 0.18, gy); c.closePath(); c.fill(); break;
+    case "bin": R(0.05, 0, 0.9, 0.9); R(0, 0.9, 1, 0.1); break;
+    case "spoon": c.beginPath(); c.ellipse(x + w * 0.22, gy - h * 0.5, w * 0.22, h * 0.5, 0, 0, 7); c.fill(); c.fillRect(x + w * 0.4, gy - h * 0.58, w * 0.6, Math.max(1, h * 0.18)); break;
+    case "block": R(0, 0, 1, 1); c.fillStyle = "#0B0F14"; for (let i = 1; i < 6; i++) c.fillRect(x + w * 0.15, gy - h * (i / 6.2), w * 0.7, Math.max(1, h * 0.012)); break;
+    case "statue": R(0.2, 0, 0.6, 0.28); R(0.38, 0.28, 0.3, 0.42); c.beginPath(); c.moveTo(x + w * 0.5, gy - h * 0.7); c.lineTo(x + w * 0.88, gy - h); c.lineTo(x + w * 0.7, gy - h * 0.66); c.closePath(); c.fill(); break;
+    case "eiffel": c.beginPath(); c.moveTo(x, gy); c.lineTo(x + w * 0.44, gy - h); c.lineTo(x + w * 0.56, gy - h); c.lineTo(x + w, gy); c.lineTo(x + w * 0.78, gy); c.lineTo(x + w * 0.5, gy - h * 0.35); c.lineTo(x + w * 0.22, gy); c.closePath(); c.fill(); break;
+    case "burj": c.beginPath(); c.moveTo(x, gy); c.lineTo(x + w * 0.38, gy - h * 0.45); c.lineTo(x + w * 0.5, gy - h); c.lineTo(x + w * 0.62, gy - h * 0.45); c.lineTo(x + w, gy); c.closePath(); c.fill(); break;
+    case "bigben": R(0.15, 0, 0.7, 0.8); R(0, 0.8, 1, 0.12); c.beginPath(); c.moveTo(x, gy - h * 0.92); c.lineTo(x + w * 0.5, gy - h); c.lineTo(x + w, gy - h * 0.92); c.closePath(); c.fill(); break;
+    case "pyramid": c.beginPath(); c.moveTo(x, gy); c.lineTo(x + w * 0.5, gy - h); c.lineTo(x + w, gy); c.closePath(); c.fill(); break;
+    case "esb": R(0.1, 0, 0.8, 0.5); R(0.22, 0.5, 0.56, 0.2); R(0.34, 0.7, 0.32, 0.16); R(0.44, 0.86, 0.12, 0.1); R(0.49, 0.96, 0.02, 0.04); break;
+    case "peak": c.beginPath(); c.moveTo(x, gy); c.lineTo(x + w * 0.45, gy - h); c.lineTo(x + w * 0.62, gy - h * 0.78); c.lineTo(x + w * 0.75, gy - h * 0.86); c.lineTo(x + w, gy); c.closePath(); c.fill(); break;
+    case "disc": case "moon": c.beginPath(); c.arc(x + w / 2, gy - h / 2, h / 2, 0, 7); c.fill(); break;
+    default: break;
+  }
+}
+function heroScale(ctx, t, n, kind, cam) {
+  const S = SCALE_SETS[kind] || SCALE_SETS.fold, nI = Math.floor(Math.max(0, n) + 1e-9);
+  const obj = S.obj(Math.max(0, n)), GY = 1170, TOPPX = 500, OBJPX = 320, MINPX = 46;
+  const nextI = S.marks.findIndex((m) => m[0] > obj * 1.0001);
+  const next = nextI < 0 ? null : S.marks[nextI];
+  let sc = OBJPX / obj;
+  if (next) sc = Math.max(Math.min(sc, TOPPX / next[0]), MINPX / obj);
+  const oh = obj * sc, ow = S.objAs === "cube" ? oh * 0.9 : Math.max(16, Math.min(120, oh * 0.5)), ox = 600;
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 640, W, 600); ctx.clip();
+  ctx.translate(540, 960); ctx.scale(cam, cam); ctx.translate(-540, -960);
+  ctx.strokeStyle = "rgba(242,244,247,.5)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(64, GY); ctx.lineTo(1016, GY); ctx.stroke();
+  // passed landmarks: most recent right next to the object, then shrinking away to the left (true scale; gaps are screen px)
+  let xr = ox - ow / 2 - 30;
+  for (let i = (nextI < 0 ? S.marks.length : nextI) - 1; i >= 0 && xr > 64; i--) {
+    const [h, k, a, label] = S.marks[i], hp = h * sc, wp = Math.max(1.5, hp * a);
+    if (k === "orbit") { const y = GY - hp; ctx.save(); ctx.setLineDash([16, 12]); ctx.strokeStyle = "rgba(255,176,32,.8)"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(64, y); ctx.lineTo(1016, y); ctx.stroke(); ctx.restore();
+      ctx.fillStyle = "#D9DDE2"; ctx.beginPath(); ctx.arc(930, y, Math.max(16, 3474e3 * sc / 2), 0, 7); ctx.fill();
+      ctx.font = mono(40); ctx.textAlign = "left"; ctx.fillStyle = P.amber; ctx.fillText("PAST THE MOON", 690, y + 50); ctx.fillText(fmtH(h), 690, y + 96); continue; }
+    if (k === "line" || k === "iss") continue;
+    const x = xr - wp; silhouette(ctx, k, x, GY, Math.max(1.5, hp), wp, "rgba(242,244,247,.34)");
+    xr = x - Math.max(10, Math.min(30, wp * 0.5));
+  }
+  // the growing object
+  if (S.objAs === "cube") {
+    const side = oh * 0.74, dx = oh * 0.26, left = ox - ow / 2, top = GY - side;
+    c3(ctx, left, top, side, dx, t);
+  } else {
+    ctx.fillStyle = "#EFE6C8"; ctx.fillRect(ox - ow / 2, GY - oh, ow, oh);
+    ctx.fillStyle = "rgba(120,100,60,.45)";
+    const L = Math.max(2, Math.min(28, Math.floor(oh / 9)));
+    for (let i = 1; i < L; i++) ctx.fillRect(ox - ow / 2, GY - (oh * i) / L, ow, 1.5);
+    ctx.fillStyle = "#FFF8E0"; ctx.fillRect(ox - ow / 2, GY - oh, ow, Math.min(4, oh));
+  }
+  // the next landmark, beside the object at true scale, with its label
+  if (next) {
+    const [h, k, a, label] = next, hp = h * sc;
+    ctx.font = mono(40); ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
+    if (k === "line" || k === "iss" || k === "orbit") {
+      const y = GY - hp; ctx.save(); ctx.setLineDash([16, 12]); ctx.strokeStyle = P.cyan; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(64, y); ctx.lineTo(1016, y); ctx.stroke(); ctx.restore();
+      if (k === "orbit") { ctx.fillStyle = "#D9DDE2"; ctx.beginPath(); ctx.arc(930, y, Math.max(16, 3474e3 * sc / 2), 0, 7); ctx.fill(); }
+      if (k === "iss") { ctx.fillStyle = "#F2F4F7"; ctx.fillRect(840, y - 5, 90, 10); ctx.fillRect(870, y - 16, 8, 32); ctx.fillRect(892, y - 16, 8, 32); }
+      { const l1 = label.toUpperCase().replace(/, 384,400 KM AWAY/, ""), l2 = k === "orbit" ? "384,400 KM AWAY" : fmtH(h);   // two-line tag on its own plate, right of the readouts
+        ctx.font = mono(36); const tw = Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width) + 28, ty = y + 14;
+        ctx.fillStyle = "rgba(11,15,20,.78)"; rrect(ctx, 1016 - tw, ty, tw, 92, 10); ctx.fill();
+        ctx.strokeStyle = P.cyan; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = P.cyan; ctx.fillText(l1, 1002, ty + 38); ctx.fillText(l2, 1002, ty + 78); }
+    } else {
+      const x = Math.max(ox + ow / 2 + 40, 700), cap = ["disc", "peak", "pyramid"].includes(k) ? 520 : 300, wp = Math.min(hp * a, cap);
+      silhouette(ctx, k, x, GY, hp, wp, "rgba(242,244,247,.78)");
+      ctx.fillStyle = P.cyan; ctx.fillText(`${label.toUpperCase()} · ${fmtH(h)}`, 1010, GY + 40);
+    }
+  }
+  // exact readouts, top-left (the tall landmarks own the right)
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; let y = 700;
+  const plate = S.read(nI).length * 100 + 20;
+  ctx.fillStyle = "rgba(11,15,20,.55)"; rrect(ctx, 56, 660, 500, plate, 14); ctx.fill();
+  for (const [lab, val] of S.read(nI)) {
+    ctx.font = mono(26); ctx.fillStyle = P.cyan; ctx.fillText(lab, 76, y);
+    ctx.font = mono(val.length > 11 ? 52 : 70); ctx.fillStyle = P.amber; ctx.fillText(val, 76, y + 62);
+    y += 100 + 0;
+  }
+  ctx.restore();
+}
+function c3(ctx, x, y, s, d, t) { // the ant cube: a dark brown block with a speckled "crawling" texture
+  const face = (pts, col) => { ctx.fillStyle = col; ctx.beginPath(); pts.forEach(([a, b], i) => ctx[i ? "lineTo" : "moveTo"](a, b)); ctx.closePath(); ctx.fill(); };
+  face([[x, y + d], [x + s, y + d], [x + s, y + d + s], [x, y + d + s]], "#3A2418");
+  face([[x, y + d], [x + d, y], [x + s + d, y], [x + s, y + d]], "#5A3A26");
+  face([[x + s, y + d], [x + s + d, y], [x + s + d, y + s], [x + s, y + d + s]], "#2A190F");
+  for (let i = 0; i < 160; i++) {
+    const a = (i * 0.618) % 1, b = (i * 0.381 + 0.17) % 1, wob = Math.sin(t * 3 + i) * 1.2;
+    ctx.fillStyle = i % 3 ? "rgba(15,8,4,.8)" : "rgba(150,100,60,.55)";
+    ctx.fillRect(x + a * s + wob, y + d + b * s, 3, 3);
+  }
+}
 function drawWhatIfSim(ctx, t, p, D) {
   const { texts: stages, starts, n, tEnd } = stagePlan(p, D);
   let si = -1; for (let i = 0; i < n; i++) if (t >= starts[i] - 1e-9) si = i;
   const sT = si < 0 ? 0 : t - starts[si];
   const curve = String(p.curve || "").split(",").map((x) => x.split(":").map(Number)).filter((x) => x.length === 2 && x.every(Number.isFinite));  // "u:w,u:w": piecewise-linear time map
-  const lin = String(p.ease || "") === "linear" || curve.length > 1, calm = ["seasons", "clock"].includes(String(p.hero || ""));   // calm = a pause, not a crash
+  const lin = String(p.ease || "") === "linear" || curve.length > 1, calm = ["seasons", "clock", "frost", "ladder"].includes(String(p.hero || ""));   // calm = a pause, not a crash
   const contact = t >= tEnd, ct = t - tEnd;
   const hit = (si >= 0 && sT < 0.35) || contact;
   const u = clamp(t / tEnd);
@@ -334,6 +504,8 @@ function drawWhatIfSim(ctx, t, p, D) {
   if (hero === "sun") heroSun(ctx, Math.min(t, tEnd), w, hit, cam);
   else if (hero === "dots") heroDots(ctx, t, Math.abs(v - a), Math.abs(b - a), contact, ct, cam);
   else if (hero === "atmosphere") heroAtmos(ctx, t, 1 - w, hit, cam);
+  else if (hero === "frost") heroFrost(ctx, t, w, cam);
+  else if (hero === "ladder") heroScale(ctx, t, v, String(p.ladder || "fold"), cam);
   else if (hero === "clock") heroClock(ctx, t, v, cam);
   else if (hero === "seasons") heroSeasons(ctx, t, contact ? Math.floor(v + 1e-9) + 0.75 : v, cam);   // the pause lands on a still winter frame
   else [mx, my] = simHero(ctx, Math.min(t, tEnd), w, hit, cam);
@@ -352,7 +524,7 @@ function drawWhatIfSim(ctx, t, p, D) {
     RTS.drawPovTag(ctx, `${epi(p)} · ${String(p.tag || "").trim() || "WHAT IF"}`, { right: simClock(simS, String(p.clock || "") === "years") });
     const full = Math.abs(b - a) / rate, per = full / Math.max(0.1, lin ? tEnd : tEnd - HOLD); // average sim seconds per real second
     ctx.save(); ctx.font = mono(24); track(ctx, 1.2); ctx.fillStyle = P.cyan; ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
-    ctx.fillText(`▶▶ 1 S ≈ ${simSpan(per)}`, 940, 296); ctx.restore();
+    ctx.fillText(p.speedUnit ? `▶▶ 1 S ≈ ${(Math.abs(b - a) / Math.max(0.1, lin ? tEnd : tEnd - HOLD)).toFixed(1).replace(/\.0$/, "")} ${String(p.speedUnit).toUpperCase()}` : `▶▶ 1 S ≈ ${simSpan(per)}`, 940, 296); ctx.restore();
     const cb = RTS.drawCounter(ctx, shown(v), { y: 320, size: 150, unit: unitFor(v), label: lbl,
       desc: contact ? (calm ? `STAGE ${n}/${n} · ${endWord}` : endWord) : `STAGE ${Math.max(1, si + 1)}/${n}`, color: (calm && !contact ? false : hit) ? P.alert : P.amber });
     if (String(p.rule || "").trim()) {
@@ -762,6 +934,26 @@ export const DEMOS = {
     tag: "Your life", rule: "Rule: 1 second = 1 year · US averages", episode: "005", hero: "seasons", endWord: "Paused",
     ease: "linear", len: "20", tail: "2", int: "floor", clock: "years",
     stages: "Your life. 1 second = 1 year. @3\nAge 5: school starts. @5\nSleep so far: about 3.5 years. @7\nDouble digits: age 10. @10\n500 million heartbeats. @13.6\nTime with family: 4.3 hours a day. @15\nMost teens still live at home. @16.6\nAbout half your family time: used. @18" } },
+  sleepless: { t: "whatif-sim", name: "You never slept again", p: {
+    premise: "You never\nslept again?", label: "Hours awake", unit: "h", start: "0", end: "264", rate: "0.000277777778",
+    tag: "Never sleep again", rule: "Rule: awake since 7:00 AM · up to 264 h", episode: "012", hero: "clock", endWord: "Stopped",
+    curve: "0:0,0.4:0.0909,0.6:0.2727,1:1", len: "20", tail: "2", clock: "", int: "floor",
+    stages: "By midnight, you'll react like you're tipsy. @3\n17 hours awake: performs like 0.05% BAC. @5.1\n24 hours: performs like 0.10% BAC. @7.2\n48 hours: rooms can start to move. @9\n72 hours: hallucinations can start. @10.8\nDay 7: our picture of hallucinations. @13.5\nEveryone sees something different. @15.6\n264 hours. Randy Gardner, age 17, 1964. @18" } },
+  cools: { t: "whatif-sim", name: "Earth cooled 3 °C every second", p: {
+    premise: "Earth cooled\n3 °C every second?", label: "Temperature", unit: "°C", start: "15", end: "-210", rate: "3",
+    tag: "Earth cools 3 °C/s", rule: "Rule: 3 °C every second, everywhere", episode: "010", hero: "frost", endWord: "Frozen",
+    curve: "0:0,0.1667:0.0489,0.2444:0.0667,0.3333:0.1467,0.4222:0.2444,0.5111:0.3689,0.6:0.4622,0.6889:0.64,0.7667:0.6978,0.8667:0.9156,1:1", len: "20", tail: "2",
+    stages: "Cooling 3 °C every second. @3\n0 °C: water freezes. @4.4\n-18 °C: your freezer. @6\n-40 °C is -40 °F. @7.6\nOymyakon, Russia: -68 °C record. @9.2\n-89 °C: coldest air ever recorded. @10.8\n-129 °C: halfway to absolute zero. @12.4\nAbout -142 °C: CO2 snows out. @13.8\nAbout -191 °C: the air starts to rain. @15.6\n-210 °C: nitrogen freezes. @18" } },
+  fold: { t: "whatif-sim", name: "You folded paper once every second", p: {
+    premise: "You folded paper\nonce every second?", label: "Folds", unit: "folds", start: "0", end: "42", rate: "1",
+    tag: "Fold paper 42x", rule: "Rule: 0.1 mm sheet, doubles every fold", episode: "013", hero: "ladder", ladder: "fold", endWord: "Past the Moon",
+    ease: "linear", int: "floor", speedUnit: "folds", len: "20", tail: "1.5",
+    stages: "One fold doubles the thickness. @3.1\nThicker than your palm now. @4.4\nTaller than you. Through the ceiling. @6.7\nTaller than a house. @7.9\nTaller than the Burj Khalifa. @10.1\nPast Mount Everest. @11.9\nPast 100 km: the edge of space. @13.3\nPast the Space Station. @14.5\nTaller than the Earth is wide. @16.3\n42 folds: past the Moon. Real record: 12 folds. @18.5" } },
+  ants: { t: "whatif-sim", name: "The number of ants doubled every second", p: {
+    premise: "The number of ants\ndoubled every second?", label: "Doublings", unit: "doublings", start: "0", end: "54", rate: "1",
+    tag: "Ants x2 every second", rule: "Rule: 1 ant, doubles every second", episode: "015", hero: "ladder", ladder: "ants", endWord: "Earth's ants",
+    ease: "linear", int: "floor", speedUnit: "doublings", len: "20", tail: "1.5",
+    stages: "One ant. It doubles every second. @3\nPast 1,000 ants: a spoonful. @4.2\nPast 50,000: a coffee mug. @5.4\nPast a million: a small bucket. @7\nPast 30 million: a wheelie bin. @8.7\nPast a billion: a garden shed. @10.3\nPast 10 billion: a living room. @11.4\nPast 100 billion: a house. @12.6\nPast a trillion: over six storeys. @13.7\nPast 10 trillion: a 13-storey block. @15.1\nTaller than the Great Pyramid. @16.8\nAbout every ant on Earth: taller than the Empire State. @18.5" } },
   moon3d: { t: "whatif-3d", name: "Moon 1 km closer (3D)", p: {} },
   sleep: { t: "day-timeline", name: "Nobody slept for a week", p: {} },
   phone3am: { t: "notif-stack", name: "Your phone at 3 a.m.", p: {} },

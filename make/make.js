@@ -177,7 +177,9 @@ if (!canWebCodecs()) { $("expmsg").className = "msg err"; $("expmsg").textConten
 const ALIAS = { "counter-sim": "whatif-sim" };
 // Remix link: ?demo=<slug> preloads that demo's template + copy; wins over ?t= if they disagree. Unknown slug = ignored.
 const demoSlug = (q.get("demo") || "").toLowerCase();
-state.demo = Object.prototype.hasOwnProperty.call(DEMOS, demoSlug) ? DEMOS[demoSlug] : null;
+// `hold: true` = built but not yet GO'd by Muse: only reachable on localhost (the export harness), never on the live site.
+const demoOk = (d) => d && (!d.hold || ["localhost", "127.0.0.1"].includes(location.hostname));
+state.demo = Object.prototype.hasOwnProperty.call(DEMOS, demoSlug) && demoOk(DEMOS[demoSlug]) ? DEMOS[demoSlug] : null;
 const initial = TEMPLATES.find((t) => t.id === (state.demo ? state.demo.t : ALIAS[q.get("t")] || q.get("t")));
 if (initial) { state.tpl = initial; }
 buildTemplates(); buildFields(); checkLicence();
