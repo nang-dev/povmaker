@@ -7,11 +7,14 @@
 <body><main class="wrap page"><h1>Licence API check</h1>
 <p>Checks whether this browser can reach Lemon Squeezy's licence API from this site (CORS + network). A "key not found" answer means it works.</p>
 <p><button id="go" class="btn primary inline">Run check</button></p><pre id="out" class="muted"></pre></main>
+<script src="config.js"></script>
 <script>
 document.getElementById("go").onclick = async () => {
   const o = document.getElementById("out"); o.textContent = "Running…";
   try {
-    const r = await fetch("https://api.lemonsqueezy.com/v1/licenses/validate", { method: "POST", headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ license_key: "00000000-0000-0000-0000-000000000000" }) });
+    const gr = (window.SITE_CONFIG || {}).provider === "gumroad";
+    const r = await fetch(gr ? "https://api.gumroad.com/v2/licenses/verify" : "https://api.lemonsqueezy.com/v1/licenses/validate", { method: "POST", headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(gr ? { product_id: "probe", license_key: "00000000-0000-0000-0000-000000000000", increment_uses_count: "false" } : { license_key: "00000000-0000-0000-0000-000000000000" }) });
     const j = await r.json().catch(() => ({}));
     o.textContent = "OK (CORS fine). HTTP " + r.status + "\n" + JSON.stringify(j, null, 1);
   } catch (e) { o.textContent = "FAILED: " + e + "\n(CORS blocked or network/hosts block on this device)"; }

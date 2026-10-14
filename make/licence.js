@@ -1,11 +1,16 @@
-// Shared licence logic (make.js + thanks.html). Lemon Squeezy public licence API, no API key, browser-side.
-// First use on a device: activate (gets an instance id). Later: validate that instance. Cached in localStorage.
+// Shared licence logic (make.js + thanks.html). Browser-side, no API key. Provider = SITE_CONFIG.provider:
+//  "lemonsqueezy" (default): public licence API; first use on a device activates (instance id), later validates that instance.
+//  "gumroad": POST api.gumroad.com/v2/licenses/verify (CORS: access-control-allow-origin *, verified 2026-10-14); no instances,
+//  active = success && !refunded && !chargebacked && !subscription_ended_at && !subscription_failed_at. Cached in localStorage.
 const C = window.SITE_CONFIG || {};
 const KEY = "povmaker.licence";
 const API = "https://api.lemonsqueezy.com/v1/licenses/";
 const STORE_ID = String(C.lsStoreId || "");
 const PRODUCT_ID = String(C.lsProductId || "");
 const LIVE = C.mode === "live";
+const GUMROAD = C.provider === "gumroad";
+const GR_API = "https://api.gumroad.com/v2/licenses/verify";
+const GR_PRODUCT = String(C.gumroadProductId || "");
 
 export const stored = () => { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch { return null; } };
 export const store = (o) => localStorage.setItem(KEY, JSON.stringify(o));
@@ -22,9 +27,21 @@ function ours(d) {
   if (LIVE && d && d.license_key && d.license_key.test_mode) return false;
   return true;
 }
+export function grActive(j) { // Gumroad verify response -> is this subscription's access live?
+  const p = (j && j.purchase) || {};
+  return !!(j && j.success) && !p.refunded && !p.chargebacked && !p.subscription_ended_at && !p.subscription_failed_at;
+}
+async function checkGumroad(key) {
+  const r = await fetch(GR_API, { method: "POST", headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ product_id: GR_PRODUCT, license_key: key, increment_uses_count: "false" }) });
+  const j = await r.json().catch(() => ({}));
+  if (grActive(j)) return { valid: true, instance_id: "gumroad" };
+  return { valid: false, error: (j && j.message) || "That key isn't valid for POVMaker." };
+}
 // -> {valid, instance_id?, error?}. Throws on network/CORS failure (callers decide offline grace).
 export async function check({ key, instance_id }) {
   if (!key) return { valid: false, error: "Enter a key." };
+  if (GUMROAD) return checkGumroad(key);
   if (!instance_id) {
     const a = await post("activate", { license_key: key, instance_name: "web-" + Math.random().toString(36).slice(2, 10) });
     if (!a.activated) return { valid: false, error: a.error || "That key isn't valid, or it's already used on 3 devices." };

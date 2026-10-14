@@ -5,14 +5,14 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 </head>
 <body><main class="wrap page"><h1>You're Pro. Thank you!</h1>
-<p>Your licence key is on the Lemon Squeezy confirmation page and in your receipt email. Paste it below to unlock Pro on this device.</p>
+<p id="where">Your licence key is on the Lemon Squeezy confirmation page and in your receipt email. Paste it below to unlock Pro on this device.</p>
 <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
   <input id="key" placeholder="Licence key" aria-label="Licence key" autocomplete="off" style="flex:1;min-width:200px">
   <button id="activate" class="btn primary inline">Activate Pro</button>
 </div>
 <p id="msg" class="msg" role="status" aria-live="polite"></p>
 <p><a class="btn sec" href="make/">Open POVMaker</a></p>
-<p class="muted">Didn't get the email? Check spam, or write to <a href="mailto:studionorthline88@gmail.com">studionorthline88@gmail.com</a>. Up to 3 devices per key.</p>
+<p class="muted">Didn't get the email? Check spam, or write to <a href="mailto:studionorthline88@gmail.com">studionorthline88@gmail.com</a>. <span id="devices">Up to 3 devices per key.</span></p>
 </main>
 <script src="config.js"></script>
 <script type="module">
@@ -20,6 +20,11 @@ import * as Lic from "./make/licence.js";
 const $ = (i) => document.getElementById(i), q = new URLSearchParams(location.search);
 // Lemon Squeezy can append ?license_key=... if configured in the redirect; accept it if present.
 const pre = q.get("license_key"); if (pre) $("key").value = pre;
+// Gumroad variant (SITE_CONFIG.provider = "gumroad"): the key is on the Gumroad receipt / library, no device limit.
+if ((window.SITE_CONFIG || {}).provider === "gumroad") {
+  $("where").textContent = "Your licence key is in your Gumroad receipt email and in your Gumroad library (gumroad.com/library). Paste it below to unlock Pro on this device.";
+  $("devices").textContent = "";
+}
 $("activate").onclick = async () => {
   const key = $("key").value.trim(); if (!key) return;
   $("msg").className = "msg"; $("msg").textContent = "Checking…";

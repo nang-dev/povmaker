@@ -4,6 +4,10 @@ window.SITE_CONFIG = {
   // Lemon Squeezy checkout links (Share > checkout link). Empty = Get Pro falls back to the waitlist.
   // GO LIVE = set mode to "live" (and fill checkoutUrls.live). Test-mode keys are rejected in live mode.
   mode: "test",
+  // Payment provider: "lemonsqueezy" (default) or "gumroad" (fallback, built but NOT live; see povmaker/gumroad-fallback.md).
+  // Gumroad has no test mode: switch = provider "gumroad" + mode "live" + checkoutUrls.live (product page) + gumroadProductId,
+  // then `node build.mjs` (legal pages pick the provider up from this file) and ./publish.sh.
+  provider: "lemonsqueezy",
   checkoutUrls: { test: "", live: "" },
   paymentUrl: "", // derived from mode+checkoutUrls by upgrade.js; leave empty
   ctaLabel: "Get early access",
@@ -18,6 +22,7 @@ window.SITE_CONFIG = {
   waitlistEndpoint: "https://formsubmit.co/ajax/studionorthline88@gmail.com",
   lsStoreId: "", // Lemon Squeezy store id (Settings > Stores); licence keys from other stores are rejected
   lsProductId: "", // optional: POVMaker Pro product id (strict licence check)
+  gumroadProductId: "", // Gumroad product id (needed by the licence verify API; only used when provider = "gumroad")
   defaultBrand: "ranthesim",
   // One page, brand picked by ?brand= or utm_campaign=. Bio links: /?utm_source=instagram&utm_campaign=ranthesim
   brands: {
