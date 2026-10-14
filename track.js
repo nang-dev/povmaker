@@ -19,7 +19,7 @@
     var q = new URLSearchParams(location.search), us = q.get("utm_source") || "";
     var ref = ""; try { var r = new URL(document.referrer); if (r.host && r.host !== location.host) ref = r.host; } catch (e) {}
     if (!s || (!s.utm_source && us)) {
-      s = { utm_source: us, utm_medium: q.get("utm_medium") || "", utm_campaign: q.get("utm_campaign") || q.get("brand") || "", ref: (s && s.ref) || ref };
+      s = { utm_source: us, utm_medium: q.get("utm_medium") || "", utm_campaign: q.get("utm_campaign") || q.get("brand") || "", utm_content: q.get("utm_content") || "", utm_term: q.get("utm_term") || "", ref: (s && s.ref) || ref };
       try { localStorage.setItem(k, JSON.stringify(s)); } catch (e) {}
     }
     return s;
@@ -29,6 +29,8 @@
     d.ft_source = FT.utm_source || FT.ref || "direct";
     if (FT.utm_medium) d.ft_medium = FT.utm_medium;
     if (FT.utm_campaign) d.ft_campaign = FT.utm_campaign;
+    if (FT.utm_content) d.ft_content = FT.utm_content;
+    if (FT.utm_term) d.ft_term = FT.utm_term;
     if (FT.ref) d.ft_ref = FT.ref;
     return d;
   }
@@ -42,6 +44,8 @@
         u.searchParams.set("utm_source", FT.utm_source);
         if (FT.utm_medium) u.searchParams.set("utm_medium", FT.utm_medium);
         if (FT.utm_campaign) u.searchParams.set("utm_campaign", FT.utm_campaign);
+        if (FT.utm_content) u.searchParams.set("utm_content", FT.utm_content);
+        if (FT.utm_term) u.searchParams.set("utm_term", FT.utm_term);
         a.href = u.toString();
       } catch (e) {}
     });
