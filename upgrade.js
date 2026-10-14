@@ -14,12 +14,19 @@
     ["utm_source", "utm_campaign", "utm_medium"].forEach(function (k) { if (utm[k] && utm[k] !== "none") u.searchParams.set("checkout[custom][" + k + "]", utm[k]); });
     href = u.toString();
   }
-  document.querySelectorAll("[data-checkout]").forEach(function (a) {
+  // Which free-tier limit the visitor just ran into (set by /make/ on export_blocked / free export_done; 30 min session memory).
+  function lastLimit() {
+    try { var l = JSON.parse(sessionStorage.getItem("povmaker.limit") || "null"); if (l && Date.now() - l.t < 30 * 60e3) return l.l; } catch (e) {}
+    return "";
+  }
+  function bind(a) {
     if (href) { a.href = href; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Upgrade to Pro · " + price; }
     else a.textContent = "Pro launching this week, get notified";
     a.addEventListener("click", function () {
-      if (window.POVTrack) window.POVTrack.track("upgrade_click", { page: location.pathname.split("/").pop() || "index", checkout: href ? "live" : "waitlist" });
+      if (window.POVTrack) window.POVTrack.track("upgrade_click", { page: location.pathname.split("/").pop() || "index", checkout: href ? "live" : "waitlist", limit: a.getAttribute("data-limit") || lastLimit() || "header" });
     });
-  });
+  }
+  window.POVUpgrade = { bind: bind };
+  document.querySelectorAll("[data-checkout]").forEach(bind);
   document.querySelectorAll("[data-testmode]").forEach(function (el) { el.hidden = C.mode === "live" || !url; });
 })();

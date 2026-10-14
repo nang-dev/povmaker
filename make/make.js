@@ -11,6 +11,16 @@ const state = { tpl: TEMPLATES[0], demo: null, params: {}, playing: true, safe: 
 
 // ---- tracking: none on a static host; UTMs ride along to checkout (see bio page) ----
 const track = (name, data) => window.POVTrack && window.POVTrack.track(name, data);
+// Which free limit the visitor just hit; upgrade.js reads it so upgrade_click carries `limit` (also on pricing.html).
+const setLimit = (l) => { try { sessionStorage.setItem("povmaker.limit", JSON.stringify({ l, t: Date.now() })); } catch {} };
+const blocked = (limit, msg, html, extra = {}) => {
+  setLimit(limit); msg.className = "msg err"; msg.innerHTML = html;
+  track("export_blocked", { limit, template: state.tpl.id, ...extra });
+};
+document.addEventListener("click", (e) => { // in-message links to /pricing (no checkout yet): count them as the upsell step
+  const a = e.target.closest && e.target.closest("a[data-limit]:not([data-checkout])");
+  if (a) track("upsell_click", { limit: a.getAttribute("data-limit"), to: "pricing" });
+});
 
 // ---- licence (logic in licence.js; shared with thanks.html) ----
 async function checkLicence() {
@@ -117,10 +127,10 @@ function tick(now) {
 $("export").onclick = async () => {
   const msg = $("expmsg"), prog = $("prog");
   msg.className = "msg";
-  if (state.tpl.pro && !state.pro) { msg.className = "msg err"; msg.innerHTML = 'This template is Pro. <a href="../pricing.html">See pricing</a> or enter your licence key.'; return; }
+  if (state.tpl.pro && !state.pro) { blocked("template_locked", msg, 'This template is Pro. <a data-limit="template_locked" href="../pricing.html">See pricing</a> or enter your licence key.'); return; }
   const D = state.tpl.duration(state.params);
-  if (!state.pro && D > FREE_MAX_S + 1e-6) { msg.className = "msg err"; msg.innerHTML = `Free exports are limited to ${FREE_MAX_S} s (this one is ${D.toFixed(1)} s). Remove a beat, or <a href="../pricing.html">go Pro</a> for up to ${PRO_MAX_S} s.`; return; }
-  if (!state.pro && left() === 0) { msg.className = "msg err"; msg.innerHTML = "You've used today's 3 free exports. <a href=\"../pricing.html\">Go Pro</a> for unlimited."; return; }
+  if (!state.pro && D > FREE_MAX_S + 1e-6) { blocked("length_cap", msg, `Free exports are limited to ${FREE_MAX_S} s (this one is ${D.toFixed(1)} s). Remove a beat, or <a data-limit="length_cap" href="../pricing.html">go Pro</a> for up to ${PRO_MAX_S} s.`, { secs: Math.round(D) }); return; }
+  if (!state.pro && left() === 0) { blocked("daily_cap", msg, `You've used today's ${FREE_PER_DAY} free exports. <a data-limit="daily_cap" href="../pricing.html">Go Pro</a> for unlimited.`); return; }
   $("export").disabled = true; prog.hidden = false; prog.value = 0; msg.textContent = "Rendering…";
   try {
     const blob = await exportMp4({ tpl: state.tpl, params: state.params, fps: state.pro ? 60 : 30, watermark: !state.pro, endCard: !state.pro, audio: sound(), onProgress: (p) => (prog.value = p) });
@@ -129,7 +139,12 @@ $("export").onclick = async () => {
     const wav = noAudio ? URL.createObjectURL(bedWav(state.tpl, state.params, { endCard: !state.pro })) : "";
     $("out").innerHTML = `<video src="${url}" controls loop playsinline></video><p><a class="btn primary" download="povmaker-${state.tpl.id}.mp4" href="${url}">Download MP4</a></p>` +
       (noAudio ? `<p class="muted">This browser can't put sound inside the MP4. <a download="povmaker-${state.tpl.id}.wav" href="${wav}">Download the sound (WAV)</a> and add it when you post (Instagram, TikTok and CapCut all take your own audio), or export on desktop Chrome / Safari 26 for a video with sound.</p>` : "");
-    if (!state.pro) { bump(); setPro(false); }
+    if (!state.pro) {
+      bump(); setPro(false); setLimit("watermark");
+      const n = document.createElement("p"); n.className = "muted";
+      n.innerHTML = 'This free export carries a watermark and end card. Remove them: <a class="btn sec inline" data-checkout data-limit="watermark" href="../index.html#waitlist">Go Pro</a>';
+      $("out").appendChild(n); window.POVUpgrade && window.POVUpgrade.bind(n.querySelector("a"));
+    }
     msg.className = "msg ok";
     msg.textContent = "Done. Post it with the AI-generated label on." + (sound() && !blob.hasAudio ? " The video has no sound in this browser, but the sound is available below." : "");
     track("export_done", { template: state.tpl.id, pro: state.pro ? 1 : 0, secs: Math.round(D), audio: blob.hasAudio ? 1 : 0, demo: state.demo ? q.get("demo") : "" });
