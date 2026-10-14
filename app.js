@@ -59,9 +59,27 @@
     var email = $("email").value.trim();
     msg.className = "msg";
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.textContent = "Enter a valid email."; msg.className = "msg err"; return; }
-    var sub = encodeURIComponent("POVMaker waitlist"), body = encodeURIComponent("Please add " + email + " to the POVMaker waitlist. (source: " + utm.utm_source + "/" + utm.utm_campaign + ")");
-    location.href = "mailto:" + (C.waitlistEmail || "") + "?subject=" + sub + "&body=" + body;
-    msg.textContent = "Your email app should open. Send the message to join the list."; msg.className = "msg ok";
+    var ft = (window.POVTrack && window.POVTrack.firstTouch) || {};
+    var src = ft.utm_source || ft.ref || utm.utm_source, camp = ft.utm_campaign || utm.utm_campaign;
+    var mailto = function () {
+      var sub = encodeURIComponent("POVMaker waitlist"), body = encodeURIComponent("Please add " + email + " to the POVMaker waitlist. (source: " + src + "/" + camp + ")");
+      location.href = "mailto:" + (C.waitlistEmail || "") + "?subject=" + sub + "&body=" + body;
+      msg.textContent = "Your email app should open. Send the message to join the list."; msg.className = "msg ok";
+    };
+    if (!C.waitlistEndpoint) return mailto();
+    var btn = form.querySelector("button"); btn.disabled = true; msg.textContent = "Adding you…";
+    fetch(C.waitlistEndpoint, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ email: email, _subject: "POVMaker waitlist: " + email, _template: "table", _honeypot: "",
+        source: src, campaign: camp, medium: ft.utm_medium || utm.utm_medium || "", referrer: ft.ref || "", page: location.href }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (String(j.success) !== "true") throw new Error(j.message || "not accepted");
+        msg.textContent = "You're on the list. We'll email you once when Pro opens."; msg.className = "msg ok";
+        form.reset();
+        if (window.POVTrack) window.POVTrack.track("waitlist_signup", { page: "index" });
+      })
+      .catch(function () { mailto(); })
+      .then(function () { btn.disabled = false; });
   });
 
   send("/track", { event: "visit" });

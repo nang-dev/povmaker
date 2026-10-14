@@ -11,6 +11,41 @@
       localStorage.setItem("povmaker.events", JSON.stringify(a.slice(-50)));
     } catch (e) {}
   }
+  // First-touch attribution (survives page changes, so events on /make/ still say where the visitor came from).
+  // The Umami pageview reads utm_* from the URL on its own; custom events don't, so every event carries ft_*.
+  var FT = (function () {
+    var k = "povmaker.ft", s = null;
+    try { s = JSON.parse(localStorage.getItem(k) || "null"); } catch (e) {}
+    var q = new URLSearchParams(location.search), us = q.get("utm_source") || "";
+    var ref = ""; try { var r = new URL(document.referrer); if (r.host && r.host !== location.host) ref = r.host; } catch (e) {}
+    if (!s || (!s.utm_source && us)) {
+      s = { utm_source: us, utm_medium: q.get("utm_medium") || "", utm_campaign: q.get("utm_campaign") || q.get("brand") || "", ref: (s && s.ref) || ref };
+      try { localStorage.setItem(k, JSON.stringify(s)); } catch (e) {}
+    }
+    return s;
+  })();
+  function stamp(data) {
+    var d = Object.assign({}, data || {});
+    d.ft_source = FT.utm_source || FT.ref || "direct";
+    if (FT.utm_medium) d.ft_medium = FT.utm_medium;
+    if (FT.utm_campaign) d.ft_campaign = FT.utm_campaign;
+    if (FT.ref) d.ft_ref = FT.ref;
+    return d;
+  }
+  // Carry the tag to the next page: internal links get the first-touch utm_* so the next Umami pageview is attributed too.
+  document.addEventListener("DOMContentLoaded", function () {
+    if (!FT.utm_source) return;
+    document.querySelectorAll("a[href]").forEach(function (a) {
+      try {
+        var u = new URL(a.href, location.href);
+        if (u.origin !== location.origin || u.searchParams.get("utm_source") || !/^https?:$/.test(u.protocol)) return;
+        u.searchParams.set("utm_source", FT.utm_source);
+        if (FT.utm_medium) u.searchParams.set("utm_medium", FT.utm_medium);
+        if (FT.utm_campaign) u.searchParams.set("utm_campaign", FT.utm_campaign);
+        a.href = u.toString();
+      } catch (e) {}
+    });
+  });
   function send(name, data) {
     try {
       if (window.umami && window.umami.track) window.umami.track(name, data || {});
@@ -25,7 +60,9 @@
     document.head.appendChild(s);
   }
   window.POVTrack = {
+    firstTouch: FT,
     track: function (name, data) {
+      data = stamp(data);
       local(name, data);
       if (!C.websiteId) return;
       if (ready) send(name, data); else queue.push([name, data]);

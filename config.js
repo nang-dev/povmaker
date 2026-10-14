@@ -13,6 +13,9 @@ window.SITE_CONFIG = {
   analytics: { provider: "umami", websiteId: "20f5089b-ce29-43e2-bd37-a096bf25050f", src: "https://cloud.umami.is/script.js" },
   api: "", // no backend on GitHub Pages; waitlist = mailto, UTMs ride to checkout.
   waitlistEmail: "studionorthline88@gmail.com",
+  // Waitlist capture with no backend: FormSubmit emails each signup to the address above (one-time activation click needed).
+  // Empty = mailto fallback only. Any failure also falls back to mailto, so a signup is never silently lost.
+  waitlistEndpoint: "https://formsubmit.co/ajax/studionorthline88@gmail.com",
   lsStoreId: "", // Lemon Squeezy store id (Settings > Stores); licence keys from other stores are rejected
   lsProductId: "", // optional: POVMaker Pro product id (strict licence check)
   defaultBrand: "ranthesim",
