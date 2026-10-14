@@ -178,7 +178,7 @@ function law3(t, p, D) {
   const a = num(p.start, 0), b = num(p.end, 0);
   const e = Math.pow(u, 0.88), s = clamp((t - tRun) / SURGE), f = Math.pow(K3, -e) * (1 - smoothstep(s));   // e: early growth a touch faster
   const v = b + (a - b) * f, R = R0_3 * Math.pow(K3, e), R75 = R0_3 * Math.pow(K3, Math.pow(0.75, 0.88));
-  return { tEnd, u, v, R, moonY: 1050 - 145 * smoothstep(u), horizon: 1350 + 90 * smoothstep(u),
+  return { tEnd, u, v, R, moonY: 1050 - 145 * smoothstep(u), horizon: 1350 + 70 * smoothstep(u),
     tide: Math.min(0.9, 0.5 * Math.pow(R / R75, 3)), bright: u, starK: 1 - 0.8 * smoothstep((u - 0.5) / 0.45), contact: t >= tEnd };
 }
 const dual = (v, unit) => {
@@ -196,14 +196,16 @@ function premiseScene(ctx, t, text) {
   const X = 64, PW = 952, PADX = 30, IW = PW - 2 * PADX, TOP = 236;
   ctx.save(); ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
   // greedy wrap on plain spaces only; "1 km" keeps its number and unit together (no-break space)
-  q = q.replace(/(\d)\s+(?=[A-Za-z°%/])/g, "$1\u00A0");
-  const words = q.split(" ");
+  q = q.replace(/(\d)[ \t]+(?=[A-Za-z°%/])/g, "$1\u00A0");
+  const hard = q.split("\n").map((l) => l.trim()).filter(Boolean);   // the user's own line breaks win
   let size = 80, ls;
   for (; size >= 72; size -= 8) {
     ctx.font = grot(size); track(ctx, -0.005 * size); ls = [];
-    let cur = "";
-    for (const w of words) { const tryS = cur ? cur + " " + w : w; if (cur && ctx.measureText(tryS).width > IW) { ls.push(cur); cur = w; } else cur = tryS; }
-    if (cur) ls.push(cur);
+    for (const seg of hard) {
+      let cur = "";
+      for (const w of seg.split(" ")) { const tryS = cur ? cur + " " + w : w; if (cur && ctx.measureText(tryS).width > IW) { ls.push(cur); cur = w; } else cur = tryS; }
+      if (cur) ls.push(cur);
+    }
     if (ls.length <= 3) break;
   }
   ls = ls.slice(0, 3);
@@ -505,12 +507,12 @@ export const TEMPLATES = [
       return Array.from({ length: n }, (_, i) => ({ t: i * gap, k: "slam", i })); } },
 ];
 
-// The 3D template shares the sim's numbers + captions; its own HUD and scene. Preview path only until Muse GOes (see make.js).
+// The 3D template shares the sim's numbers + captions; its own HUD and scene. First in the picker = the default (Muse GO r1).
 const SIM = TEMPLATES[0];
-TEMPLATES.push({ id: "whatif-3d", name: "What If · Night Sky (3D)", brand: "ranthesim", pro: false, preview: true,
+TEMPLATES.unshift({ id: "whatif-3d", name: "What If · Night Sky (3D)", brand: "ranthesim", pro: false, wmTop: true,
   blurb: "One thing coming at you over a night sea. Real angular size, our HUD.",
   fields: [
-    { key: "premise", label: "The question (a sentence; 'What if' is added if missing)", type: "textarea", def: "What if the Moon got 1 km closer every second?" },
+    { key: "premise", label: "The question (a sentence; 'What if' is added if missing)", type: "textarea", def: "What if the Moon got\n1 km closer\nevery second?" },
     ...SIM.fields.filter((f) => ["label", "unit", "start", "end", "rate"].includes(f.key)),
     { key: "rule", label: "Rule line (shows ~2 s at the start; optional)", type: "text", def: "Rule: 1 km/s · not real orbital physics" },
     SIM.fields.find((f) => f.key === "stages"),
@@ -534,7 +536,7 @@ export const DEMOS = {
   birthday: { t: "whatif-sim", name: "Strangers walked in until two shared a birthday", p: {
     premise: "Strangers walked in until\ntwo shared a birthday?", label: "In the room", unit: "people", start: "0", end: "23", rate: "1",
     tag: "Birthday room", rule: "Rule: 365 days, no Feb 29", episode: "008",
-    stages: "One stranger per second.\nEach one meets everyone.\nPerson 5: a 2.7% chance.\nPerson 9: nearly 10%.\nPerson 23: over 50%. A coin flip." } },
+    stages: "One stranger per second.\nEach one meets everyone.\nPerson 5: a 2.7% chance.\nPerson 9: nearly 10%.\nBy person 23: over 50%. Keep watching." } },
   carrington: { t: "whatif-sim", name: "The 1859 solar storm lit up your sky", p: {
     premise: "The 1859 solar storm\nlit up your sky\ntonight?", label: "Cloud distance to Earth", unit: "km", start: "149600000", end: "0", rate: "2361.11",
     tag: "1859 storm, tonight", rule: "Rule: 1859 timeline, replayed tonight", episode: "009",
@@ -571,7 +573,13 @@ export function renderFrame(ctx, tpl, params, t, opts = {}) {
       ctx.globalAlpha = clamp((t - (D - 0.35)) / 0.35); tpl.draw(ctx, 0, params, D); ctx.globalAlpha = 1;
     }
   }
-  if (opts.watermark && !(opts.endCard && t >= D)) {
+  if (opts.watermark && tpl.wmTop && !(opts.endCard && t >= D)) {
+    // 3D scene: the free watermark goes top-right (Muse r1), clear of the glitter column and the Moon
+    ctx.save(); ctx.globalAlpha = 0.7; ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
+    ctx.font = mono(26); ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(0,0,0,.8)"; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2;
+    ctx.fillText(SITE || "Made with POVMaker", 1016, 250);
+    ctx.restore();
+  } else if (opts.watermark && !(opts.endCard && t >= D)) {
     // single line inside the safe box (y <= 1440, x <= 940), right-aligned, above the platform caption zone
     ctx.save(); ctx.globalAlpha = 0.75; ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
     ctx.font = inter(30, 800); ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(0,0,0,.8)"; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2;
