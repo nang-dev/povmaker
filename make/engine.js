@@ -594,9 +594,9 @@ export const TEMPLATES = [
       return Array.from({ length: n }, (_, i) => ({ t: i * gap, k: "slam", i })); } },
 ];
 
-// The 3D template shares the sim's numbers + captions; its own HUD and scene. Preview path again (Muse r3 withdrew the default): reachable via ?t=whatif-3d / ?demo=moon3d / ?preview=1.
+// The 3D template shares the sim's numbers + captions; its own HUD and scene. First in the picker = the default (Muse r3 FINAL GO 8.5).
 const SIM = TEMPLATES[0];
-TEMPLATES.push({ id: "whatif-3d", name: "What If · Night Sky (3D)", brand: "ranthesim", pro: false, preview: true, wmTop: true,
+TEMPLATES.unshift({ id: "whatif-3d", name: "What If · Night Sky (3D)", brand: "ranthesim", pro: false, wmTop: true,
   blurb: "One thing coming at you over a night sea. Real angular size, our HUD.",
   fields: [
     { key: "premise", label: "The question (a sentence; 'What if' is added if missing)", type: "textarea", def: "What if the Moon got\n1 km closer\nevery second?" },
