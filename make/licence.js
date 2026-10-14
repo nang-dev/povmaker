@@ -29,7 +29,9 @@ function ours(d) {
 }
 export function grActive(j) { // Gumroad verify response -> is this subscription's access live?
   const p = (j && j.purchase) || {};
-  return !!(j && j.success) && !p.refunded && !p.chargebacked && !p.subscription_ended_at && !p.subscription_failed_at;
+  // real API fields (verified 2026-10-14): refunded, disputed + dispute_won, subscription_{cancelled,ended,failed}_at; `chargebacked` kept for older docs.
+  const lostDispute = (p.disputed && !p.dispute_won) || p.chargebacked;
+  return !!(j && j.success) && !p.refunded && !lostDispute && !p.subscription_ended_at && !p.subscription_failed_at;
 }
 async function checkGumroad(key) {
   const r = await fetch(GR_API, { method: "POST", headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },

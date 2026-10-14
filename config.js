@@ -1,14 +1,14 @@
 // Edit this file only (plus NAME in build.mjs for the legal pages).
 window.SITE_CONFIG = {
   productName: "POVMaker",
-  // Lemon Squeezy checkout links (Share > checkout link). Empty = Get Pro falls back to the waitlist.
-  // GO LIVE = set mode to "live" (and fill checkoutUrls.live). Test-mode keys are rejected in live mode.
-  mode: "test",
-  // Payment provider: "lemonsqueezy" (default) or "gumroad" (fallback, built but NOT live; see povmaker/gumroad-fallback.md).
+  // Checkout link (Gumroad product page). Empty = Get Pro falls back to the waitlist (site not on sale).
+  // GO LIVE = fill checkoutUrls.live, node build.mjs, ./publish.sh (see povmaker/GUMROAD-GO.md).
+  mode: "live",
+  // Payment provider: "gumroad" (live path, CEO #2688) or "lemonsqueezy" (old plan, see povmaker/gumroad-fallback.md).
   // Gumroad has no test mode: switch = provider "gumroad" + mode "live" + checkoutUrls.live (product page) + gumroadProductId,
   // then `node build.mjs` (legal pages pick the provider up from this file) and ./publish.sh.
-  provider: "lemonsqueezy",
-  checkoutUrls: { test: "", live: "" },
+  provider: "gumroad",
+  checkoutUrls: { test: "", live: "https://northline61.gumroad.com/l/yhuccq" },
   paymentUrl: "", // derived from mode+checkoutUrls by upgrade.js; leave empty
   ctaLabel: "Get early access",
   priceLabel: "$9/mo", // shown on the Upgrade button and in the plan box (keep in sync with the LS product + terms)
@@ -22,7 +22,7 @@ window.SITE_CONFIG = {
   waitlistEndpoint: "https://formsubmit.co/ajax/studionorthline88@gmail.com",
   lsStoreId: "", // Lemon Squeezy store id (Settings > Stores); licence keys from other stores are rejected
   lsProductId: "", // optional: POVMaker Pro product id (strict licence check)
-  gumroadProductId: "", // Gumroad product id (needed by the licence verify API; only used when provider = "gumroad")
+  gumroadProductId: "hFwO80Xuaa5EjkGxut-OmQ==", // Gumroad product id (needed by the licence verify API; only used when provider = "gumroad")
   defaultBrand: "ranthesim",
   // One page, brand picked by ?brand= or utm_campaign=. Bio links: /?utm_source=instagram&utm_campaign=ranthesim
   brands: {

@@ -11,7 +11,8 @@
     var q = new URLSearchParams(location.search); // direct hit on /make/?utm_source=... counts too (first touch wins on the bio page)
     if (q.get("utm_source") && !utm.utm_source) { utm = { utm_source: q.get("utm_source"), utm_campaign: q.get("utm_campaign") || "none", utm_medium: q.get("utm_medium") || "" }; try { localStorage.setItem("utm", JSON.stringify(utm)); } catch (e) {} }
     var u = new URL(url);
-    ["utm_source", "utm_campaign", "utm_medium"].forEach(function (k) { if (utm[k] && utm[k] !== "none") u.searchParams.set("checkout[custom][" + k + "]", utm[k]); });
+    // Lemon Squeezy keeps checkout[custom][*] on the order; Gumroad drops unknown params, so do not send them there (attribution = Umami).
+    if (C.provider !== "gumroad") ["utm_source", "utm_campaign", "utm_medium"].forEach(function (k) { if (utm[k] && utm[k] !== "none") u.searchParams.set("checkout[custom][" + k + "]", utm[k]); });
     href = u.toString();
   }
   // Which free-tier limit the visitor just ran into (set by /make/ on export_blocked / free export_done; 30 min session memory).
