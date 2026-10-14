@@ -15,6 +15,19 @@ const TB = SAFE.textBox, TW = TB.x1 - TB.x0;
 const num = (v, d) => { const n = Number(String(v).replace(/[, _]/g, "")); return Number.isFinite(n) ? n : d; };
 const fmt = (n) => Math.round(n).toLocaleString("en-US");
 const clock = (t) => `T+${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+// Sim-time clock: the counter's progress divided by the stated rate, so the HUD clock and the premise never disagree.
+function simClock(s) {
+  s = Math.max(0, Math.round(s));
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  if (d) return `T+${d}D ${String(h).padStart(2, "0")}H ${String(m).padStart(2, "0")}M`;
+  if (h) return `T+${h}H ${String(m).padStart(2, "0")}M`;
+  return clock(s);
+}
+function simSpan(s) { // "7 H", "3 M", "2 D": the nearest whole unit
+  const u = s >= 86400 * 1.5 ? [86400, "D"] : s >= 3600 * 1.5 ? [3600, "H"] : s >= 90 ? [60, "M"] : [1, "S"];
+  const v = Math.max(1, Math.round(s / u[0]));
+  return `${v} ${u[1]}`;
+}
 const epi = (p) => "SIM #" + String(p.episode || "001").padStart(3, "0");
 function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
 
@@ -71,48 +84,65 @@ function premiseHook(ctx, t, lines, { y = 236 } = {}) {
   ctx.restore();
   return y + h;
 }
-// The moving sim behind everything: a body that spirals inward as the run escalates, with debris.
-function simHero(ctx, t, u, hot) {
-  const cx = 540, cy = 960;
-  ctx.save(); ctx.globalAlpha = 0.6;
+// The moving sim behind everything: a body that spirals in to Earth's limb as the counter runs (w 0..1), growing 1x to 3x.
+function simHero(ctx, t, w, hot, cam) {
+  const cx = 540, cy = 960, EARTH = 104, R0 = 440;
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(cam, cam); ctx.translate(-cx, -cy);
+  ctx.globalAlpha = 0.6;
   ctx.strokeStyle = "rgba(61,214,245,.18)"; ctx.lineWidth = 2;
   for (const r of [200, 320, 440]) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke(); }
   const g = ctx.createRadialGradient(cx - 40, cy - 40, 20, cx, cy, 150);
   g.addColorStop(0, "#5FA8D8"); g.addColorStop(1, "#14304A");
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, 104, 0, 7); ctx.fill();
-  const orbR = 440 - 250 * Math.pow(u, 1.4), ang = t * (0.45 + 0.8 * u);
-  const ox = cx + Math.cos(ang) * orbR, oy = cy + Math.sin(ang) * orbR * 0.8;
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, EARTH, 0, 7); ctx.fill();
+  const mr = 24 * (1 + 2 * w), limb = EARTH + mr - 4;
+  const orbR = limb + (R0 - limb) * (1 - w), sq = 0.8 + 0.2 * w, ang = t * (0.45 + 0.8 * w);
+  const ox = cx + Math.cos(ang) * orbR, oy = cy + Math.sin(ang) * orbR * sq;
   for (let i = 1; i <= 14; i++) {
-    const a = ang - i * 0.04, r = 440 - 250 * Math.pow(u, 1.4);
+    const a = ang - i * 0.04;
     ctx.fillStyle = `rgba(255,176,32,${0.32 * (1 - i / 14)})`;
-    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.8, 20 - i, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * orbR, cy + Math.sin(a) * orbR * sq, Math.max(2, mr * (1 - i / 14) * 0.85), 0, 7); ctx.fill();
   }
-  ctx.fillStyle = hot ? P.alert : P.amber; ctx.beginPath(); ctx.arc(ox, oy, 24, 0, 7); ctx.fill();
+  ctx.fillStyle = hot ? P.alert : P.amber; ctx.beginPath(); ctx.arc(ox, oy, mr, 0, 7); ctx.fill();
   for (let i = 0; i < 26; i++) {
-    const k = (i * 0.618) % 1, a = i * 2.4 + t * (0.1 + k * 0.25), r = 150 + ((i * 97) % 300) * (1 - 0.3 * u);
+    const k = (i * 0.618) % 1, a = i * 2.4 + t * (0.1 + k * 0.25), r = 150 + ((i * 97) % 300) * (1 - 0.3 * w);
     ctx.fillStyle = `rgba(242,244,247,${0.12 + 0.3 * k})`;
     ctx.fillRect(cx + Math.cos(a) * r - 3, cy + Math.sin(a) * r * 0.8 - 3, 6, 6);
   }
   ctx.restore();
+  return [ox, oy];
 }
+const TAIL = 1.5; // contact hold: counter red + flash before the end card
 function drawWhatIfSim(ctx, t, p, D) {
-  const stages = rows(p.stages), n = Math.max(1, stages.length), run = D - HOLD - 1.0;
+  const stages = rows(p.stages), n = Math.max(1, stages.length), tEnd = D - TAIL, run = tEnd - HOLD;
   const stageT = run / n;
   const si = t < HOLD ? -1 : Math.min(n - 1, Math.floor((t - HOLD) / stageT));
   const sT = si < 0 ? 0 : t - HOLD - si * stageT;
-  const hit = si >= 0 && sT < 0.35;
-  const u = clamp(t / (D - 1.0));
-  const v = num(p.start, 0) + (num(p.end, 1e6) - num(p.start, 0)) * Math.pow(u, 2.2);
-  simBg(ctx, t); simHero(ctx, t, u, hit);
+  const contact = t >= tEnd, ct = t - tEnd;
+  const hit = (si >= 0 && sT < 0.35) || contact;
+  const u = clamp(t / tEnd);
+  const a = num(p.start, 0), b = num(p.end, 1e6), v = a + (b - a) * Math.pow(u, 2.2);
+  const w = b === a ? 1 : clamp((v - a) / (b - a));
+  const rate = Math.max(1e-9, num(p.rate, 1)), simS = Math.abs(v - a) / rate;
+  const shake = contact && ct < 0.3 ? Math.sin(ct * 110) * 14 * (1 - ct / 0.3) : 0;
+  const cam = 1 + 0.3 * clamp(t / tEnd);
+  ctx.save(); ctx.translate(shake, shake * 0.5);
+  simBg(ctx, t); const [mx, my] = simHero(ctx, Math.min(t, tEnd), w, hit, cam);
+  if (contact && ct < 0.7) { // shockwave from the contact point
+    ctx.save(); ctx.strokeStyle = `rgba(255,90,60,${0.7 * (1 - ct / 0.7)})`; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.arc(540 + (mx - 540) * cam, 960 + (my - 960) * cam, 60 + ct * 1300, 0, 7); ctx.stroke(); ctx.restore();
+  }
   const unit = String(p.unit || "").trim(), lbl = String(p.label || "COUNT");
   if (t < HOLD) {
-    const b = premiseHook(ctx, t, premiseLines(p));
-    RTS.drawCounter(ctx, fmt(v), { y: b + 24, size: 96, unit, label: "" });
+    const bt = premiseHook(ctx, t, premiseLines(p));
+    RTS.drawCounter(ctx, fmt(v), { y: bt + 24, size: 96, unit, label: "" });
   } else {
     RTS.drawHudFrame(ctx, { scrim: true });
-    RTS.drawPovTag(ctx, `${epi(p)} · ${String(p.tag || "").trim() || "WHAT IF"}`, { right: clock(t - HOLD) });
-    const cb = RTS.drawCounter(ctx, fmt(v), { y: 290, size: 150, unit, label: lbl,
-      desc: `STAGE ${si + 1}/${n}`, color: hit ? P.alert : P.amber });
+    RTS.drawPovTag(ctx, `${epi(p)} · ${String(p.tag || "").trim() || "WHAT IF"}`, { right: simClock(simS) });
+    const full = Math.abs(b - a) / rate, per = full / Math.max(0.1, tEnd - HOLD); // average sim seconds per real second
+    ctx.save(); ctx.font = mono(24); track(ctx, 1.2); ctx.fillStyle = P.cyan; ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
+    ctx.fillText(`▶▶ 1 S ≈ ${simSpan(per)}`, 940, 296); ctx.restore();
+    const cb = RTS.drawCounter(ctx, fmt(v), { y: 320, size: 150, unit, label: lbl,
+      desc: contact ? "CONTACT" : `STAGE ${si + 1}/${n}`, color: hit ? P.alert : P.amber });
     if (String(p.rule || "").trim()) {
       ctx.save(); ctx.font = mono(28); track(ctx, 1.6); ctx.fillStyle = "rgba(242,244,247,.78)"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
       ctx.fillText(String(p.rule).toUpperCase(), 64, cb + 40, 876); ctx.restore();
@@ -122,9 +152,11 @@ function drawWhatIfSim(ctx, t, p, D) {
     RTS.drawCaption(ctx, stages[si] || "", { y: 1262, maxLines: 2 });
     ctx.restore();
     ctx.fillStyle = P.line; ctx.fillRect(TB.x0, 1240, TW, 6);
-    ctx.fillStyle = P.amber; ctx.fillRect(TB.x0, 1240, TW * u, 6);
-    if (hit && sT < 1 / 30) { ctx.fillStyle = "rgba(255,255,255,.45)"; ctx.fillRect(0, 0, W, H); }
+    ctx.fillStyle = contact ? P.alert : P.amber; ctx.fillRect(TB.x0, 1240, TW * u, 6);
+    if (hit && sT < 1 / 30 && !contact) { ctx.fillStyle = "rgba(255,255,255,.45)"; ctx.fillRect(0, 0, W, H); }
   }
+  ctx.restore();
+  if (contact && ct < 0.25) { ctx.fillStyle = `rgba(255,255,255,${0.75 * (1 - ct / 0.25)})`; ctx.fillRect(0, 0, W, H); }
 }
 
 // ---------- 2. Day timeline ----------
@@ -164,7 +196,7 @@ function parseChat(p) {
   });
 }
 function chatTimes(msgs) {
-  let t = 0.9; const gap = 1.7;
+  let t = 0; const gap = 1.7;
   return msgs.map((m, i) => { const at = m.at != null ? m.at : (i ? t + gap : t); t = at; return at; });
 }
 function chatDuration(p) { const ts = chatTimes(parseChat(p)); return clamp(ts[ts.length - 1] + 2.4, 5, 30); }
@@ -198,7 +230,7 @@ function chatScene(ctx, t, kind) {
 function drawPovChat(ctx, t, p, D) {
   const msgs = parseChat(p), times = chatTimes(msgs), n = msgs.length;
   chatScene(ctx, t, p.scene);
-  const lastAt = times[n - 1], sh = t >= lastAt + 0.3 && t < lastAt + 0.7 ? (Math.sin(t * 90) * 8) : 0;
+  const lastAt = times[n - 1], sh = n > 1 && t >= lastAt + 0.3 && t < lastAt + 0.7 ? (Math.sin(t * 90) * 8) : 0;
   ctx.save(); ctx.translate(sh, 0);
   SC.drawPovTag(ctx, p.pov || "POV: you're the side character");
   const S = SC.drawHudFrame(ctx, { y: 500, h: 890 });
@@ -224,15 +256,20 @@ function drawPovChat(ctx, t, p, D) {
   for (const b of lay) {
     const age = t - b.at;
     if (age < 0) {
-      if (!b.m.me && age > -0.8 && lay.indexOf(b) === shown.length) {
-        ctx.fillStyle = M.recv; rrect(ctx, x0, b.y, 140, 66, 33); ctx.fill();
-        ctx.fillStyle = "#9CA3AF";
-        for (let d = 0; d < 3; d++) { ctx.beginPath(); ctx.arc(x0 + 38 + d * 32, b.y + 33 - Math.abs(Math.sin(t * 8 + d)) * 8, 9, 0, 7); ctx.fill(); }
+      // typing dots for the next bubble: always for message 2 (running from frame 0), else the last 0.8 s before it lands
+      const nextIdx = lay.indexOf(b) === shown.length;
+      if (nextIdx && (age > -0.8 || shown.length === 1)) {
+        const bx = b.m.me ? x1 - 140 : x0;
+        ctx.fillStyle = b.m.me ? M.sent : M.recv; rrect(ctx, bx, b.y, 140, 66, 33); ctx.fill();
+        ctx.fillStyle = b.m.me ? "rgba(255,255,255,.85)" : "#9CA3AF";
+        for (let d = 0; d < 3; d++) { ctx.beginPath(); ctx.arc(bx + 38 + d * 32, b.y + 33 - Math.abs(Math.sin(t * 8 + d)) * 8, 9, 0, 7); ctx.fill(); }
       }
       continue;
     }
     ctx.font = inter(fsz, 600);
-    const k = easeBack(age / 0.22), bwid = Math.min(bw, Math.max(...b.ls.map((l) => ctx.measureText(l).width)) + 48);
+    const isLast = lay.indexOf(b) === n - 1 && n > 1;
+    // frame-0 message is simply there; the punch (last bubble) pops in whole with a 1.0 -> 1.08 -> 1.0 bounce
+    const k = b.at <= 0 ? 1 : isLast ? 1 + 0.08 * Math.sin(Math.PI * clamp(age / 0.3)) : easeBack(age / 0.22), bwid = Math.min(bw, Math.max(...b.ls.map((l) => ctx.measureText(l).width)) + 48);
     const x = b.m.me ? x1 - bwid : x0, ax = x + (b.m.me ? bwid : 0);
     ctx.save(); ctx.translate(ax, b.y + b.h); ctx.scale(k, k); ctx.translate(-ax, -(b.y + b.h));
     if (b.lab) { ctx.fillStyle = M.grey; ctx.font = inter(26, 800); ctx.textBaseline = "alphabetic"; ctx.fillText(b.m.who, x + 8, b.y - 10); ctx.font = inter(fsz, 600); }
@@ -245,13 +282,16 @@ function drawPovChat(ctx, t, p, D) {
 }
 
 // ---------- 4. Notification stack (Pro) ----------
-function drawNotifs(ctx, t, p, D) {
-  const items = rows(p.notifs).map((l) => { const i = l.indexOf(":"); return i > 0 && i < 22 ? [l.slice(0, i), l.slice(i + 1).trim()] : ["Messages", l]; });
-  const n = Math.max(1, items.length), gap = (D - 1.0 - 1.4) / n;
+function notifBg(ctx, t) {
   const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#1f2a5a"); g.addColorStop(1, "#7a2d6b");
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "rgba(255,255,255,.08)";
   [[200, 500, 300], [850, 1200, 380], [500, 1500, 260]].forEach(([x, y, r], i) => { ctx.beginPath(); ctx.arc(x + Math.sin(t + i) * 30, y + Math.cos(t * .8 + i) * 30, r, 0, 7); ctx.fill(); });
+}
+function drawNotifs(ctx, t, p, D) {
+  const items = rows(p.notifs).map((l) => { const i = l.indexOf(":"); return i > 0 && i < 22 ? [l.slice(0, i), l.slice(i + 1).trim()] : ["Messages", l]; });
+  const n = Math.max(1, items.length), gap = (D - 1.0 - 1.4) / n;
+  notifBg(ctx, t);
   SC.drawPovTag(ctx, p.pov || "POV: your phone at 3 a.m.");
   ctx.fillStyle = "#fff"; ctx.font = inter(150, 800); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
   ctx.fillText(p.time || "3:07", 502, 640);
@@ -274,12 +314,15 @@ function drawNotifs(ctx, t, p, D) {
 }
 
 // ---------- 5. Big caption (Pro, meme-native Anton) ----------
-function drawBigCaption(ctx, t, p, D) {
-  const lines = rows(p.lines), n = Math.max(1, lines.length), gap = (D - 1.0) / n;
-  const i = Math.min(n - 1, Math.floor(t / gap)), age = t - i * gap;
+function capBg(ctx, t) {
   ctx.fillStyle = M.sent; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "rgba(255,255,255,.08)";
   for (let s = -H; s < W + H; s += 140) { ctx.beginPath(); ctx.moveTo(s + t * 40, 0); ctx.lineTo(s + 70 + t * 40, 0); ctx.lineTo(s - H + 70 + t * 40, H); ctx.lineTo(s - H + t * 40, H); ctx.fill(); }
+}
+function drawBigCaption(ctx, t, p, D) {
+  const lines = rows(p.lines), n = Math.max(1, lines.length), gap = (D - 1.0) / n;
+  const i = Math.min(n - 1, Math.floor(t / gap)), age = t - i * gap;
+  capBg(ctx, t);
   SC.drawPovTag(ctx, p.pov || "POV: you're the side character");
   const k = easeBack(age / 0.2), sh = age < 0.25 ? Math.sin(age * 120) * 10 * (1 - age / 0.25) : 0;
   ctx.save(); ctx.translate(502 + sh, 820); ctx.scale(0.7 + 0.3 * k, 0.7 + 0.3 * k); ctx.translate(-502, -820);
@@ -297,20 +340,21 @@ export const TEMPLATES = [
       { key: "unit", label: "Counter unit", type: "text", def: "km" },
       { key: "start", label: "Counter starts at", type: "number", def: "384400" },
       { key: "end", label: "Counter ends at", type: "number", def: "0" },
+      { key: "rate", label: "Counter speed in sim time (units per second; sets the HUD clock)", type: "number", def: "1" },
       { key: "tag", label: "Short tag (shows after the question)", type: "text", def: "Moon +1 km/s" },
       { key: "rule", label: "Rule line (optional)", type: "text", def: "Rule: 1 km/s · not real orbital physics" },
       { key: "stages", label: "Captions, one per beat (one per line)", type: "textarea", def: "Tides start to climb\nCoastlines go under at dawn\nThe sky is mostly Moon\nThen it stops. Almost." },
       { key: "episode", label: "Sim number", type: "text", def: "001" },
     ],
-    duration: (p) => dur(HOLD + 1.0, 3.2, rows(p.stages).length, 8, 45), draw: drawWhatIfSim,
-    cues: (p, D) => { const n = Math.max(1, rows(p.stages).length), st = (D - HOLD - 1.0) / n;
-      return [{ t: HOLD, k: "exit" }, ...Array.from({ length: n }, (_, i) => ({ t: HOLD + i * st, k: "stage", i }))]; } },
+    duration: (p) => dur(HOLD + TAIL, 3.2, rows(p.stages).length, 8, 45), draw: drawWhatIfSim, bg: (ctx, t) => simBg(ctx, t),
+    cues: (p, D) => { const n = Math.max(1, rows(p.stages).length), st = (D - HOLD - TAIL) / n;
+      return [{ t: HOLD, k: "exit" }, ...Array.from({ length: n }, (_, i) => ({ t: HOLD + i * st, k: "stage", i })), { t: D - TAIL, k: "hit" }]; } },
   { id: "day-timeline", name: "Day 1 → Day 10,000", brand: "ranthesim", pro: false, blurb: "A timeline that escalates, one beat at a time.",
     fields: [
       { key: "question", label: "The question", type: "text", def: "What if nobody slept for a week?" },
       { key: "lines", label: "Beats: 'When: what happens'", type: "textarea", def: "Day 1: Everyone is fine. Coffee sales spike.\nDay 3: Focus drops by a third.\nDay 5: Hallucinations are common.\nDay 7: Cities run on pure adrenaline." },
     ],
-    duration: (p) => dur(4, 3.6, rows(p.lines).length), draw: drawTimeline,
+    duration: (p) => dur(4, 3.6, rows(p.lines).length), draw: drawTimeline, bg: (ctx, t) => simBg(ctx, t),
     cues: (p, D) => { const n = Math.max(1, rows(p.lines).length), gap = (D - 2.0 - 1.2) / n;
       return Array.from({ length: n }, (_, i) => ({ t: 0.4 + i * gap, k: "pop", i })); } },
   { id: "pov-chat", name: "POV Chat", brand: "sidecharpov", pro: false, blurb: "Our Side Character look: a POV tag + a group chat from the side character's phone, up to 6 messages.",
@@ -321,7 +365,7 @@ export const TEMPLATES = [
       { key: "messages", label: "Messages, max 6: 'Name: text'. Start yours with 'me:'. Optional ' @3.5' = seconds in.", type: "textarea",
         def: "Duck: a jogger is on the path\nme: on it\nFrog: he's literally just jogging\nme: he made eye contact\nDuck: he's sprinting now\nme: you're welcome for the cardio @9.4" },
     ],
-    duration: chatDuration, draw: drawPovChat,
+    duration: chatDuration, draw: drawPovChat, bg: (ctx, t, p) => chatScene(ctx, t, p.scene),
     cues: (p) => { const ms = parseChat(p), ts = chatTimes(ms);
       return ms.map((m, i) => ({ t: ts[i], k: m.me ? "send" : "recv", i, last: i === ms.length - 1 })); } },
   { id: "notif-stack", name: "Notification Stack", brand: "sidecharpov", pro: true, blurb: "Lock-screen notifications pile up. Pure chaos.",
@@ -330,7 +374,7 @@ export const TEMPLATES = [
       { key: "time", label: "Clock", type: "text", def: "3:07" },
       { key: "notifs", label: "Notifications ('App: text')", type: "textarea", def: "Mum: you up?\nBank: unusual activity detected\nGroup chat: 47 new messages\nCalendar: Meeting in 5 hours\nBattery: 1% remaining" },
     ],
-    duration: (p) => dur(3, 2.2, rows(p.notifs).length), draw: drawNotifs,
+    duration: (p) => dur(3, 2.2, rows(p.notifs).length), draw: drawNotifs, bg: notifBg,
     cues: (p, D) => { const n = Math.max(1, rows(p.notifs).length), gap = (D - 1.0 - 1.4) / n;
       return Array.from({ length: n }, (_, i) => ({ t: 0.6 + i * gap, k: "ding", i })); } },
   { id: "big-caption", name: "Big Caption", brand: "sidecharpov", pro: true, blurb: "Meme-native Anton captions that hit one at a time.",
@@ -338,7 +382,7 @@ export const TEMPLATES = [
       { key: "pov", label: "POV tag", type: "text", def: "POV: the other driver" },
       { key: "lines", label: "Captions (one per line)", type: "textarea", def: "Me, going the speed limit\nHim, doing it the hard way\nThe light was green for 11 seconds\nHe still hasn't moved" },
     ],
-    duration: (p) => dur(2.5, 2.4, rows(p.lines).length), draw: drawBigCaption,
+    duration: (p) => dur(2.5, 2.4, rows(p.lines).length), draw: drawBigCaption, bg: capBg,
     cues: (p, D) => { const n = Math.max(1, rows(p.lines).length), gap = (D - 1.0) / n;
       return Array.from({ length: n }, (_, i) => ({ t: i * gap, k: "slam", i })); } },
 ];
@@ -361,10 +405,13 @@ export function renderFrame(ctx, tpl, params, t, opts = {}) {
   ctx.save(); ctx.clearRect(0, 0, W, H);
   if (t >= D && opts.endCard) {
     ctx.fillStyle = "#0A0E14"; ctx.fillRect(0, 0, W, H);
+    if (tpl.bg) { tpl.bg(ctx, t, params); ctx.fillStyle = "rgba(10,14,20,.62)"; ctx.fillRect(0, 0, W, H); }
+    ctx.save(); ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = 14;
     ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
     ctx.font = grot(104); ctx.fillText("Made with", W / 2, 800); ctx.fillText("POVMaker", W / 2, 920);
     ctx.font = inter(58, 800); ctx.fillStyle = RTS.PALETTE.cyan; ctx.fillText("Make videos like this", W / 2, 1060);
     if (SITE) { ctx.font = mono(50); ctx.fillStyle = RTS.PALETTE.amber; ctx.fillText(SITE, W / 2, 1150, 960); }
+    ctx.restore();
   } else {
     tpl.draw(ctx, Math.min(t, D - 1 / 60), params, D);
     // blend the last 0.35s back into frame 0 so the video loops cleanly
@@ -376,7 +423,8 @@ export function renderFrame(ctx, tpl, params, t, opts = {}) {
     // single line inside the safe box (y <= 1440, x <= 940), right-aligned, above the platform caption zone
     ctx.save(); ctx.globalAlpha = 0.75; ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
     ctx.font = inter(30, 800); ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(0,0,0,.8)"; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2;
-    ctx.fillText("Made with POVMaker" + (SITE ? " · " + SITE : ""), 940, 1432);
+    const full = "Made with POVMaker" + (SITE ? " · " + SITE : "");
+    ctx.fillText(ctx.measureText(full).width <= 820 ? full : "Made with POVMaker", 940, 1432);
     ctx.restore();
   }
   ctx.restore();

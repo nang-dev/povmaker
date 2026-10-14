@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en" data-brand="ranthesim"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>POVMaker · make a video</title>
+<title>Make a What If video in 60 seconds · POVMaker</title>
 <meta property="og:title" content="POVMaker · make a video">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://nang-dev.github.io/povmaker/og-card.png">
@@ -10,12 +10,17 @@
 <meta property="og:image:alt" content="POVMaker: make videos like these">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://nang-dev.github.io/povmaker/og-card.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230B0F14%27/%3E%3Crect x=%277%27 y=%277%27 width=%2711%27 height=%2711%27 fill=%27%23FFB020%27/%3E%3C/svg%3E">
 <link rel="stylesheet" href="../style.css">
 <style>
  .app{max-width:980px;margin:0 auto;padding:16px;display:grid;gap:20px}
  @media(min-width:820px){.app{grid-template-columns:360px 1fr}}
- .stage{display:grid;gap:10px;justify-items:center;align-content:start}
+ .top{grid-column:1/-1;order:-2}
+ .top h1{font-size:clamp(24px,6vw,34px);line-height:1.15;margin:0}
+ .stage{display:grid;gap:10px;justify-items:center;align-content:start;order:-1}
+ @media(min-width:820px){.stage{order:0;grid-column:2;grid-row:2}.form{grid-column:1;grid-row:2}}
  canvas{width:100%;max-width:340px;aspect-ratio:9/16;background:#000;border-radius:12px}
+ @media(max-width:819px){canvas{height:auto;width:calc(min(56vh,560px)*9/16);max-width:100%}}
  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
  label{display:block;font-size:13px;color:var(--mut);margin:12px 0 4px}
  textarea{width:100%;min-height:110px;padding:12px;border-radius:var(--r);border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit}
@@ -33,9 +38,12 @@
 </style></head>
 <body>
 <main class="app">
- <section>
-  <p><a href="../index.html">← Home</a> · <a href="../pricing.html">Pricing</a></p>
-  <h1>POVMaker</h1>
+ <header class="top">
+  <p style="margin:0 0 6px"><a href="../index.html">← POVMaker</a> · <a href="../pricing.html">Pricing</a></p>
+  <h1>Make a What If video in 60 seconds</h1>
+  <p class="muted" style="margin:6px 0 0">Edit the words. Hit Export. Free, no sign-up.</p>
+ </header>
+ <section class="form">
   <label for="tpl">Template</label><select id="tpl"></select>
   <p id="blurb" class="muted"></p>
   <div id="fields"></div>

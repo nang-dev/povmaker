@@ -135,7 +135,8 @@ const BEDS = {
       m.blip(s.t + 0.03, 520 * Math.pow(1.12, i), 0.22);
       if (s !== last) { m.pulse(s.t, 0.7); }
     });
-    if (last) { const r0 = Math.max(hold + 0.6, last.t - 1.4); m.riser(r0, last.t - 0.02, 0.34); m.boom(last.t, 1.0); m.pad(last.t, D + (endCard ? 1.3 : 0.3), [45, 52, 57, 64], 0.2, 0.3); }
+    const hit = cues.find((c) => c.k === "hit")?.t ?? last?.t; // contact = the payoff
+    if (last && hit != null) { const r0 = Math.max(hold + 0.6, hit - 1.4); m.riser(r0, hit - 0.02, 0.34); m.boom(hit, 1.0); m.pad(hit, D + (endCard ? 1.3 : 0.3), [45, 52, 57, 64], 0.2, 0.3); }
   },
   "pov-chat"(m, cues, D, endCard) {
     const msgs = cues.filter((c) => c.k === "send" || c.k === "recv"), end = D + (endCard ? 1.4 : 0.3);
