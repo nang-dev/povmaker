@@ -201,20 +201,20 @@ function drawPovChat(ctx, t, p, D) {
   const lastAt = times[n - 1], sh = t >= lastAt + 0.3 && t < lastAt + 0.7 ? (Math.sin(t * 90) * 8) : 0;
   ctx.save(); ctx.translate(sh, 0);
   SC.drawPovTag(ctx, p.pov || "POV: you're the side character");
-  const S = SC.drawHudFrame(ctx, { y: 548, h: 830 });
+  const S = SC.drawHudFrame(ctx, { y: 500, h: 890 });
   const pad = 26, x0 = S.x + pad, x1 = S.x + S.w - pad, tw = x1 - x0;
   ctx.fillStyle = M.recv; rrect(ctx, S.x, S.y, S.w, 110, 0); ctx.fill();
   ctx.fillStyle = M.accent; ctx.beginPath(); ctx.arc(x0 + 30, S.y + 62, 28, 0, 7); ctx.fill();
   ctx.fillStyle = M.ink; ctx.font = inter(34, 800); ctx.textBaseline = "middle"; ctx.textAlign = "left";
   ctx.fillText(p.contact || "Group chat", x0 + 76, S.y + 62, tw - 80);
-  const fsz = 40, lh = 54, LAB = 34;
+  const fsz = 40, lh = 50, LAB = 30;
   ctx.font = inter(fsz, 600);
-  const bw = tw * 0.82, top = S.y + 130, bottomLimit = S.y + S.h - 24, lay = [];
+  const bw = tw * 0.86, top = S.y + 126, bottomLimit = S.y + S.h - 24, lay = [];
   let y = top;
   msgs.forEach((m, i) => {
     const ls = wrap(ctx, m.text, bw - 48), lab = !m.me && m.who && (i === 0 || msgs[i - 1].who !== m.who || msgs[i - 1].me) ? LAB : 0;
-    const h = ls.length * lh + 36;
-    lay.push({ m, ls, lab, y: y + lab, h, at: times[i] }); y += lab + h + 22;
+    const h = ls.length * lh + 30;
+    lay.push({ m, ls, lab, y: y + lab, h, at: times[i] }); y += lab + h + 14;
   });
   const shown = lay.filter((b) => t >= b.at);
   const bottom = shown.length ? shown[shown.length - 1].y + shown[shown.length - 1].h : top;
@@ -238,7 +238,7 @@ function drawPovChat(ctx, t, p, D) {
     if (b.lab) { ctx.fillStyle = M.grey; ctx.font = inter(26, 800); ctx.textBaseline = "alphabetic"; ctx.fillText(b.m.who, x + 8, b.y - 10); ctx.font = inter(fsz, 600); }
     ctx.fillStyle = b.m.me ? M.sent : M.recv; rrect(ctx, x, b.y, bwid, b.h, 28); ctx.fill();
     ctx.fillStyle = b.m.me ? "#fff" : M.ink; ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
-    b.ls.forEach((l, i) => ctx.fillText(l, x + 24, b.y + 18 + 40 + i * lh - 4));
+    b.ls.forEach((l, i) => ctx.fillText(l, x + 24, b.y + 15 + 40 + i * lh - 4));
     ctx.restore();
   }
   ctx.restore(); ctx.restore();
@@ -315,7 +315,7 @@ export const TEMPLATES = [
       { key: "contact", label: "Chat name", type: "text", def: "Pond group chat" },
       { key: "scene", label: "Scene behind the phone", type: "select", def: "pond", options: [["pond", "Pond"], ["meadow", "Meadow"], ["night", "Night"], ["plain", "Plain grey"]] },
       { key: "messages", label: "Messages, max 6: 'Name: text'. Start yours with 'me:'. Optional ' @3.5' = seconds in.", type: "textarea",
-        def: "Duck: did you see that?\nDuck: he just got the bread\nme: i've been standing here for 3 years\nme: i literally honk on command\nFrog: bro it's a pond, relax\nme: it's MY pond" },
+        def: "Duck: a jogger is on the path\nme: on it\nFrog: he's literally just jogging\nme: he made eye contact\nDuck: he's sprinting now\nme: you're welcome for the cardio @9.4" },
     ],
     duration: chatDuration, draw: drawPovChat },
   { id: "notif-stack", name: "Notification Stack", brand: "sidecharpov", pro: true, blurb: "Lock-screen notifications pile up. Pure chaos.",
