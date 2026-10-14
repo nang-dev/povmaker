@@ -10,7 +10,7 @@ window.SITE_CONFIG = {
   priceLabel: "$9/mo", // shown on the Upgrade button and in the plan box (keep in sync with the LS product + terms)
   // Funnel analytics (no backend). Cookie-less Umami Cloud script; EMPTY websiteId = analytics off, nothing is loaded.
   // Events: visit_bio, visit_make, template_select, export_done, upgrade_click.
-  analytics: { provider: "umami", websiteId: "", src: "https://cloud.umami.is/script.js" },
+  analytics: { provider: "umami", websiteId: "20f5089b-ce29-43e2-bd37-a096bf25050f", src: "https://cloud.umami.is/script.js" },
   api: "", // no backend on GitHub Pages; waitlist = mailto, UTMs ride to checkout.
   waitlistEmail: "studionorthline88@gmail.com",
   lsStoreId: "", // Lemon Squeezy store id (Settings > Stores); licence keys from other stores are rejected
