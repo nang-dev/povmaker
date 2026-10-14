@@ -1,6 +1,6 @@
 import { Muxer, ArrayBufferTarget } from "./vendor/mp4-muxer.mjs";
 import { W, H } from "./brand.js";
-import { renderFrame } from "./engine.js";
+import { renderFrame, END_CARD_S } from "./engine.js";
 
 const CODECS = [["avc", "avc1.64002A"], ["avc", "avc1.640028"], ["avc", "avc1.4D002A"], ["vp9", "vp09.00.50.08"]];
 
@@ -20,7 +20,7 @@ export async function exportMp4({ tpl, params, fps, watermark, endCard, onProgre
   let err = null;
   const enc = new VideoEncoder({ output: (c, m) => muxer.addVideoChunk(c, m), error: (e) => { err = e; } });
   enc.configure(pick.cfg);
-  const total = tpl.duration(params) + (endCard ? 1.2 : 0), frames = Math.round(total * fps);
+  const total = tpl.duration(params) + (endCard ? END_CARD_S : 0), frames = Math.round(total * fps);
   for (let i = 0; i < frames; i++) {
     if (err) throw err;
     renderFrame(ctx, tpl, params, i / fps, { watermark, endCard });

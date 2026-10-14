@@ -59,7 +59,8 @@ function buildFields() {
   state.params = defaults(state.tpl);
   state.tpl.fields.forEach((fd) => {
     const l = document.createElement("label"); l.textContent = fd.label; l.htmlFor = "f-" + fd.key; f.appendChild(l);
-    const el = fd.type === "textarea" ? document.createElement("textarea") : document.createElement("input");
+    const el = document.createElement(fd.type === "textarea" ? "textarea" : fd.type === "select" ? "select" : "input");
+    if (fd.type === "select") fd.options.forEach(([v, n]) => { const o = document.createElement("option"); o.value = v; o.textContent = n; el.appendChild(o); });
     el.id = "f-" + fd.key; el.value = fd.def; if (fd.type === "number") el.inputMode = "numeric";
     el.oninput = () => { state.params[fd.key] = el.value; state.t0 = performance.now(); };
     f.appendChild(el);
@@ -100,7 +101,8 @@ $("export").onclick = async () => {
 
 await loadFonts();
 if (!canWebCodecs()) { $("expmsg").className = "msg err"; $("expmsg").textContent = "Heads up: this browser can't export video. Use Chrome, Edge or Safari 16.4+."; }
-const initial = TEMPLATES.find((t) => t.id === q.get("t"));
+const ALIAS = { "counter-sim": "whatif-sim" };
+const initial = TEMPLATES.find((t) => t.id === (ALIAS[q.get("t")] || q.get("t")));
 if (initial) { state.tpl = initial; }
 buildTemplates(); buildFields(); checkLicence();
 requestAnimationFrame(tick);

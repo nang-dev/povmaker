@@ -4,7 +4,8 @@ import * as SC from "./kits/sidecharpov/brand.js";
 export { RTS, SC };
 export const W = 1080, H = 1920;
 export const SAFE = RTS.SAFE;
-export const SITE = "nang-dev.github.io/povmaker";
+// Public URL shown on free exports. Empty until we own a domain (Muse 2026-10-14: no personal GitHub handle on exports).
+export const SITE = "";
 export async function loadFonts() {
   await Promise.all([RTS.loadFonts("kits/ranthesim/"), SC.loadFonts("kits/sidecharpov/")]);
 }
