@@ -1,5 +1,5 @@
 import { W, H, loadFonts, drawSafeOverlay } from "./brand.js";
-import { TEMPLATES, DEMOS, defaults, renderFrame } from "./engine.js";
+import { TEMPLATES, DEMOS, defaults, renderFrame, set3D, get3D, set3DRes } from "./engine.js";
 import { exportMp4, canWebCodecs, bedWav } from "./export.js";
 import { renderBed, RATE } from "./audio.js";
 import * as Lic from "./licence.js";
@@ -7,6 +7,16 @@ import * as Lic from "./licence.js";
 const $ = (id) => document.getElementById(id);
 const FREE_PER_DAY = 3, FREE_MAX_S = 20, PRO_MAX_S = 45;
 const q = new URLSearchParams(location.search);
+// The 3D template is on a preview path until Muse GOes: hidden from the picker unless the link asks for it.
+const showPreview = q.get("t") === "whatif-3d" || q.get("demo") === "moon3d" || q.get("preview") === "1";
+let g3p = null;
+// Lazy-load the three.js scene (~136 KB gzip) only when the 3D template is used. false = no WebGL / load failed.
+const ensure3D = () => g3p || (g3p = (async () => {
+  try {
+    if (get3D() && !get3D().lost) return true;
+    const m = await import("./scene3d.bundle.js"); set3D(m.createScene3D()); set3DRes(1280); return true;
+  } catch (e) { console.warn("3D unavailable", e); return false; }
+})());
 const state = { tpl: TEMPLATES[0], demo: null, params: {}, playing: true, safe: false, pro: false, t0: performance.now() };
 
 // ---- tracking: none on a static host; UTMs ride along to checkout (see bio page) ----
@@ -87,7 +97,7 @@ $("snd").onchange = () => { localStorage.setItem("povmaker.sound", sound() ? "1"
 function buildTemplates() {
   const sel = $("tpl"), cur = state.tpl.id;
   sel.innerHTML = "";
-  TEMPLATES.forEach((t) => {
+  TEMPLATES.filter((t) => !t.preview || showPreview).forEach((t) => {
     const o = document.createElement("option"); o.value = t.id;
     o.textContent = t.name + (t.pro && !state.pro ? " (Pro)" : ""); sel.appendChild(o);
   });
@@ -107,7 +117,7 @@ function buildFields() {
   document.documentElement.dataset.brand = state.tpl.brand;
   state.t0 = performance.now();
 }
-$("tpl").onchange = (e) => { state.tpl = TEMPLATES.find((t) => t.id === e.target.value); state.demo = null; buildFields(); queuePreview(); track("template_select", { template: state.tpl.id }); };
+$("tpl").onchange = (e) => { state.tpl = TEMPLATES.find((t) => t.id === e.target.value); state.demo = null; buildFields(); queuePreview(); track("template_select", { template: state.tpl.id }); if (state.tpl.id === "whatif-3d") ensure3D(); };
 $("play").onclick = () => { state.playing = !state.playing; $("play").textContent = state.playing ? "Pause" : "Play"; state.t0 = performance.now() - (state.frozen || 0); startPreview(); };
 $("safe").onchange = (e) => { state.safe = e.target.checked; };
 
@@ -132,13 +142,23 @@ $("export").onclick = async () => {
   if (!state.pro && D > FREE_MAX_S + 1e-6) { blocked("length_cap", msg, `Free exports are limited to ${FREE_MAX_S} s (this one is ${D.toFixed(1)} s). Remove a beat, or <a data-limit="length_cap" href="../pricing.html">go Pro</a> for up to ${PRO_MAX_S} s.`, { secs: Math.round(D) }); return; }
   if (!state.pro && left() === 0) { blocked("daily_cap", msg, `You've used today's ${FREE_PER_DAY} free exports. <a data-limit="daily_cap" href="../pricing.html">Go Pro</a> for unlimited.`); return; }
   $("export").disabled = true; prog.hidden = false; prog.value = 0; msg.textContent = "Rendering…";
+  let use = state.tpl, par = state.params, fell = false;
+  // 3D template: if WebGL/the scene module isn't available (or the context is lost) export the 2D What If Sim with the same words.
+  const to2D = () => {
+    const sim = TEMPLATES.find((t) => t.id === "whatif-sim"), p = state.params; fell = true; use = sim;
+    par = { ...defaults(sim), premise: String(p.premise || "").replace(/^\s*what if\s+/i, ""), label: p.label, unit: p.unit, start: p.start, end: p.end, rate: p.rate,
+      tag: "", rule: p.rule, stages: p.stages };
+  };
   try {
-    const blob = await exportMp4({ tpl: state.tpl, params: state.params, fps: state.pro ? 60 : 30, watermark: !state.pro, endCard: !state.pro, audio: sound(), onProgress: (p) => (prog.value = p) });
+    if (use.id === "whatif-3d") { if (!(await ensure3D()) || get3D().lost) to2D(); else set3DRes(state.pro ? 1920 : 1280); }
+    const doExport = () => exportMp4({ tpl: use, params: par, fps: state.pro ? 60 : 30, watermark: !state.pro, endCard: !state.pro, audio: sound(), onProgress: (p) => (prog.value = p) });
+    let blob = await doExport();
+    if (use.id === "whatif-3d" && get3D() && get3D().lost) { to2D(); msg.textContent = "Rendering the 2D look…"; blob = await doExport(); }
     const url = URL.createObjectURL(blob);
     const wantSound = sound(), noAudio = wantSound && !blob.hasAudio;
-    const wav = noAudio ? URL.createObjectURL(bedWav(state.tpl, state.params, { endCard: !state.pro })) : "";
-    $("out").innerHTML = `<video src="${url}" controls loop playsinline></video><p><a class="btn primary" download="povmaker-${state.tpl.id}.mp4" href="${url}">Download MP4</a></p>` +
-      (noAudio ? `<p class="muted">This browser can't put sound inside the MP4. <a download="povmaker-${state.tpl.id}.wav" href="${wav}">Download the sound (WAV)</a> and add it when you post (Instagram, TikTok and CapCut all take your own audio), or export on desktop Chrome / Safari 26 for a video with sound.</p>` : "");
+    const wav = noAudio ? URL.createObjectURL(bedWav(use, par, { endCard: !state.pro })) : "";
+    $("out").innerHTML = `<video src="${url}" controls loop playsinline></video><p><a class="btn primary" download="povmaker-${use.id}.mp4" href="${url}">Download MP4</a></p>` +
+      (noAudio ? `<p class="muted">This browser can't put sound inside the MP4. <a download="povmaker-${use.id}.wav" href="${wav}">Download the sound (WAV)</a> and add it when you post (Instagram, TikTok and CapCut all take your own audio), or export on desktop Chrome / Safari 26 for a video with sound.</p>` : "");
     if (!state.pro) {
       bump(); setPro(false); setLimit("watermark");
       const n = document.createElement("p"); n.className = "muted";
@@ -146,10 +166,10 @@ $("export").onclick = async () => {
       $("out").appendChild(n); window.POVUpgrade && window.POVUpgrade.bind(n.querySelector("a"));
     }
     msg.className = "msg ok";
-    msg.textContent = "Done. Post it with the AI-generated label on." + (sound() && !blob.hasAudio ? " The video has no sound in this browser, but the sound is available below." : "");
-    track("export_done", { template: state.tpl.id, pro: state.pro ? 1 : 0, secs: Math.round(D), audio: blob.hasAudio ? 1 : 0, demo: state.demo ? q.get("demo") : "" });
+    msg.textContent = "Done. Post it with the AI-generated label on." + (sound() && !blob.hasAudio ? " The video has no sound in this browser, but the sound is available below." : "") + (fell ? " 3D isn't available in this browser, so this export uses the 2D What If look." : "");
+    track("export_done", { template: state.tpl.id, rendered: use.id, pro: state.pro ? 1 : 0, secs: Math.round(D), audio: blob.hasAudio ? 1 : 0, demo: state.demo ? q.get("demo") : "" });
   } catch (e) { msg.className = "msg err"; msg.textContent = e.message || "Export failed."; }
-  finally { $("export").disabled = false; prog.hidden = true; }
+  finally { $("export").disabled = false; prog.hidden = true; if (get3D()) set3DRes(1280); }
 };
 
 await loadFonts();
@@ -161,5 +181,6 @@ state.demo = Object.prototype.hasOwnProperty.call(DEMOS, demoSlug) ? DEMOS[demoS
 const initial = TEMPLATES.find((t) => t.id === (state.demo ? state.demo.t : ALIAS[q.get("t")] || q.get("t")));
 if (initial) { state.tpl = initial; }
 buildTemplates(); buildFields(); checkLicence();
+if (state.tpl.id === "whatif-3d") ensure3D();
 requestAnimationFrame(tick);
 track("visit_make", { template: state.tpl.id, demo: state.demo ? demoSlug : "", source: (JSON.parse(localStorage.getItem("utm") || "{}").utm_source) || "direct" });

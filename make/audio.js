@@ -186,6 +186,8 @@ const BEDS = {
   },
 };
 
+BEDS["whatif-3d"] = BEDS["whatif-sim"]; // same synth bed: drone + heartbeat + riser, boom on the contact cue
+
 export function renderBed(tpl, params, { endCard = false } = {}) {
   const D = tpl.duration(params), secs = D + (endCard ? 1.5 : 0);
   const m = new Mix(secs);

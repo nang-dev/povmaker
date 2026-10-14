@@ -159,6 +159,121 @@ function drawWhatIfSim(ctx, t, p, D) {
   if (contact && ct < 0.25) { ctx.fillStyle = `rgba(255,255,255,${0.75 * (1 - ct / 0.25)})`; ctx.fillRect(0, 0, W, H); }
 }
 
+// ---------- 1b. What If · Night Sky (3D): one three.js scene (make/3d-src/scene3d.js) under our scene-style HUD ----------
+// The scene module is loaded lazily by make.js (set3D). Until it is there, or if its GL context is lost, a flat 2D stand-in
+// is drawn so nothing ever breaks mid-preview/export (make.js also tells the user and swaps to the 2D sim for the export).
+let G3 = null;
+export const set3D = (m) => { G3 = m; };
+export const get3D = () => G3;
+export const set3DRes = (h) => { if (G3 && !G3.lost) G3.setRes(h); };
+const HOLD3 = 3.5, RULE_S = 1.8, SURGE = 0.4, K3 = 20.6, R0_3 = 23.3; // premise hold; rule caption at the cut; contact surge; Moon grows x20.6 (R 23 -> 480 px = 89% of the frame width)
+const smoothstep = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
+// Everything the scene shows is a function of u (run progress): the Moon's size follows the true 1/d law because the
+// counter itself is d(t) = end + (start - end) / K^u, so the pixels and the number can never disagree.
+function law3(t, p, D) {
+  const tEnd = D - TAIL, tRun = tEnd - SURGE, u = clamp(t / tRun);
+  const a = num(p.start, 0), b = num(p.end, 0);
+  const e = Math.pow(u, 0.88), s = clamp((t - tRun) / SURGE), f = Math.pow(K3, -e) * (1 - smoothstep(s));   // e: early growth a touch faster
+  const v = b + (a - b) * f, R = R0_3 * Math.pow(K3, e), R75 = R0_3 * Math.pow(K3, Math.pow(0.75, 0.88));
+  return { tEnd, u, v, R, moonY: 1050 - 145 * smoothstep(u), horizon: 1350 + 90 * smoothstep(u),
+    tide: Math.min(0.9, 0.5 * Math.pow(R / R75, 3)), bright: u, starK: 1 - 0.8 * smoothstep((u - 0.5) / 0.45), contact: t >= tEnd };
+}
+const dual = (v, unit) => {
+  const u = String(unit || "").trim().toLowerCase(), n = Math.abs(v);
+  if (u === "km") return fmt(n * 0.621371) + " MI";
+  if (u === "m") return fmt(n * 3.28084) + " FT";
+  if (u === "kg") return fmt(n * 2.20462) + " LB";
+  if (u === "km/h" || u === "km/s") return fmt(n * 0.621371) + (u === "km/h" ? " MPH" : " MI/S");
+  return "";
+};
+function premiseScene(ctx, t, text) {
+  let q = String(text || "").trim() || "What if something weird happened?";
+  if (!/^what if\b/i.test(q)) q = "What if " + q.charAt(0).toLowerCase() + q.slice(1);
+  if (!/[?]$/.test(q)) q += "?";
+  const X = 64, PW = 952, PADX = 30, IW = PW - 2 * PADX, TOP = 236;
+  ctx.save(); ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+  // greedy wrap on plain spaces only; "1 km" keeps its number and unit together (no-break space)
+  q = q.replace(/(\d)\s+(?=[A-Za-z°%/])/g, "$1\u00A0");
+  const words = q.split(" ");
+  let size = 80, ls;
+  for (; size >= 72; size -= 8) {
+    ctx.font = grot(size); track(ctx, -0.005 * size); ls = [];
+    let cur = "";
+    for (const w of words) { const tryS = cur ? cur + " " + w : w; if (cur && ctx.measureText(tryS).width > IW) { ls.push(cur); cur = w; } else cur = tryS; }
+    if (cur) ls.push(cur);
+    if (ls.length <= 3) break;
+  }
+  ls = ls.slice(0, 3);
+  const lh = Math.round(size * 1.05), kickBase = TOP + 26 + 40;
+  const g = ctx.createLinearGradient(0, 200, 0, 760); g.addColorStop(0, "rgba(10,14,20,.30)"); g.addColorStop(1, "rgba(10,14,20,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 200, W, 560);
+  const shadow = () => { ctx.shadowColor = "rgba(10,14,20,.65)"; ctx.shadowBlur = 16; ctx.shadowOffsetY = 3; };
+  ctx.save(); shadow(); ctx.fillStyle = P.amber; ctx.fillRect(X + PADX, kickBase - 30, 26, 26);
+  ctx.font = mono(44); track(ctx, 3.5); ctx.fillText(`SIM #${String(1).padStart(3, "0")}`, X + PADX + 44, kickBase); ctx.restore();
+  const bottom = kickBase + 14 + ls.length * lh + 26;
+  ctx.save(); shadow(); ctx.font = grot(size); track(ctx, -0.005 * size);
+  ls.forEach((l, i) => {
+    const by = kickBase + 14 + (i + 0.84) * lh, last = i === ls.length - 1, qm = last && l.endsWith("?"), body = qm ? l.slice(0, -1) : l;
+    ctx.fillStyle = P.text; ctx.fillText(body, X + PADX, by);
+    let x = X + PADX + ctx.measureText(body).width;
+    if (qm) { ctx.fillStyle = P.amber; ctx.fillText("?", x, by); x += ctx.measureText("?").width; }
+    if (last && Math.floor(t / 0.5) % 2 === 0) { ctx.fillStyle = P.amber; ctx.fillRect(x + 8, by - size * 0.7, size * 0.46, size * 0.72); }
+  });
+  ctx.restore();
+  ctx.strokeStyle = "rgba(255,176,32,.8)"; ctx.lineWidth = 2; const L = 36;   // TL + BR brackets only
+  ctx.beginPath(); ctx.moveTo(X, TOP + L); ctx.lineTo(X, TOP); ctx.lineTo(X + L, TOP); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(X + PW - L, bottom); ctx.lineTo(X + PW, bottom); ctx.lineTo(X + PW, bottom - L); ctx.stroke();
+  ctx.restore();
+  return bottom;
+}
+function drawWhatIf3D(ctx, t, p, D) {
+  const stages = rows(p.stages), n = Math.max(1, stages.length), L = law3(t, p, D), tEnd = L.tEnd;
+  const tS = HOLD3 + (String(p.rule || "").trim() ? RULE_S : 0), stageT = (tEnd - tS) / n;
+  const si = t < tS ? -1 : Math.min(n - 1, Math.floor((t - tS) / stageT)), sT = si < 0 ? 0 : t - tS - si * stageT;
+  const contact = L.contact, ct = t - tEnd, hit = (si >= 0 && sT < 0.35) || contact;
+  const shake = contact && ct < 0.3 ? Math.sin(ct * 110) * 14 * (1 - ct / 0.3) : 0;
+  ctx.save(); ctx.translate(shake, shake * 0.5);
+  let drawn = false;
+  if (G3 && !G3.lost) {
+    try {
+      const cv = G3.render({ t, rPx: L.R, moonY: L.moonY, horizon: L.horizon, tide: L.tide, bright: L.bright, starK: L.starK });
+      ctx.drawImage(cv, 0, 0, W, H); drawn = true;
+    } catch (e) { G3.lost = true; }
+  }
+  if (!drawn) { // stand-in while the 3D module loads / after a lost context
+    simBg(ctx, t);
+    ctx.fillStyle = "#D9DCE0"; ctx.beginPath(); ctx.arc(540, L.moonY, L.R, 0, 7); ctx.fill();
+    ctx.fillStyle = "#0b2236"; ctx.fillRect(0, L.horizon, W, H - L.horizon);
+  }
+  if (contact && ct < 0.7) { // shockwave from the Moon's centre
+    ctx.save(); ctx.strokeStyle = `rgba(255,90,60,${0.7 * (1 - ct / 0.7)})`; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.arc(540, L.moonY, L.R * 0.6 + ct * 1300, 0, 7); ctx.stroke(); ctx.restore();
+  }
+  const unit = String(p.unit || "").trim(), color = hit ? P.alert : P.amber;
+  if (t < HOLD3) {
+    const bt = premiseScene(ctx, t, p.premise);
+    RTS.drawCounter(ctx, fmt(L.v), { y: bt + 14, size: 96, unit, label: "" });
+  } else {
+    const g = ctx.createLinearGradient(0, 0, 0, 700); g.addColorStop(0, "rgba(10,14,20,.42)"); g.addColorStop(1, "rgba(10,14,20,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, 700);
+    const bt = RTS.drawCounter(ctx, fmt(L.v), { y: 236, size: 120, unit, units2: dual(L.v, unit),
+      desc: contact ? "CONTACT" : String(p.label || "").trim(), color });
+    const a = num(p.start, 0), rate = Math.max(1e-9, num(p.rate, 1)), simS = Math.abs(L.v - a) / rate;
+    const per = Math.abs(num(p.end, 0) - a) / rate / Math.max(0.1, tEnd - HOLD3);
+    ctx.save(); ctx.font = mono(24); track(ctx, 1.2); ctx.fillStyle = "rgba(242,244,247,.78)"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.shadowColor = "rgba(10,14,20,.7)"; ctx.shadowBlur = 8;
+    ctx.fillText(`${simClock(simS)}  ·  ▶▶ 1 S ≈ ${simSpan(per)}`, 64, bt + 24, 876); ctx.restore();
+    const cap = si < 0 ? String(p.rule || "").trim() : stages[si] || "";
+    const k = si < 0 ? 1 : easeBack(sT / 0.25);
+    ctx.save(); ctx.globalAlpha = si < 0 ? 1 : clamp(sT / 0.15); ctx.translate(0, (1 - k) * 30);
+    RTS.drawCaption(ctx, cap, { y: 1262, maxLines: 2 });
+    ctx.restore();
+    if (hit && sT < 1 / 30 && !contact && si >= 0) { ctx.fillStyle = "rgba(255,255,255,.45)"; ctx.fillRect(0, 0, W, H); }
+  }
+  ctx.restore();
+  if (contact && ct < 0.25) { ctx.fillStyle = `rgba(255,255,255,${0.75 * (1 - ct / 0.25)})`; ctx.fillRect(0, 0, W, H); }
+}
+
 // ---------- 2. Day timeline ----------
 function drawTimeline(ctx, t, p, D) {
   const items = rows(p.lines).map((l) => { const i = l.indexOf(":"); return i > 0 && i < 24 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : ["", l]; });
@@ -387,11 +502,28 @@ export const TEMPLATES = [
       return Array.from({ length: n }, (_, i) => ({ t: i * gap, k: "slam", i })); } },
 ];
 
+// The 3D template shares the sim's numbers + captions; its own HUD and scene. Preview path only until Muse GOes (see make.js).
+const SIM = TEMPLATES[0];
+TEMPLATES.push({ id: "whatif-3d", name: "What If · Night Sky (3D)", brand: "ranthesim", pro: false, preview: true,
+  blurb: "One thing coming at you over a night sea. Real angular size, our HUD.",
+  fields: [
+    { key: "premise", label: "The question (a sentence; 'What if' is added if missing)", type: "textarea", def: "What if the Moon got 1 km closer every second?" },
+    ...SIM.fields.filter((f) => ["label", "unit", "start", "end", "rate"].includes(f.key)),
+    { key: "rule", label: "Rule line (shows ~2 s at the start; optional)", type: "text", def: "Rule: 1 km/s · not real orbital physics" },
+    SIM.fields.find((f) => f.key === "stages"),
+  ],
+  duration: (p) => dur(HOLD3 + (String(p.rule || "").trim() ? RULE_S : 0) + TAIL, 3.2, rows(p.stages).length, 8, 45),
+  draw: drawWhatIf3D,
+  bg: (ctx, t, p) => { if (G3 && !G3.lost) { try { ctx.drawImage(G3.render({ t, rPx: 90, moonY: 900, horizon: 1380, tide: 0, bright: 0.3, starK: 1 }), 0, 0, W, H); return; } catch (e) { G3.lost = true; } } simBg(ctx, t); },
+  cues: (p, D) => { const n = Math.max(1, rows(p.stages).length), tS = HOLD3 + (String(p.rule || "").trim() ? RULE_S : 0), st = (D - TAIL - tS) / n;
+    return [{ t: HOLD3, k: "exit" }, ...Array.from({ length: n }, (_, i) => ({ t: tS + i * st, k: "stage", i })), { t: D - TAIL, k: "hit" }]; } });
+
 // Remix deep links: /make/?t=<template>&demo=<slug> preloads that demo's copy ("make this exact one"). `p` overrides the
 // template defaults; {} = the template's own default demo. Unknown slugs are ignored.
 export const DEMOS = {
   goose: { t: "pov-chat", name: "Goose vs. jogger", p: {} },
   moon: { t: "whatif-sim", name: "Moon 1 km closer every second", p: {} },
+  moon3d: { t: "whatif-3d", name: "Moon 1 km closer (3D)", p: {} },
   sleep: { t: "day-timeline", name: "Nobody slept for a week", p: {} },
   phone3am: { t: "notif-stack", name: "Your phone at 3 a.m.", p: {} },
   driver: { t: "big-caption", name: "The other driver", p: {} },
