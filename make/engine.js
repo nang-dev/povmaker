@@ -302,13 +302,17 @@ export const TEMPLATES = [
       { key: "stages", label: "Captions, one per beat (one per line)", type: "textarea", def: "Tides start to climb\nCoastlines go under at dawn\nThe sky is mostly Moon\nThen it stops. Almost." },
       { key: "episode", label: "Sim number", type: "text", def: "001" },
     ],
-    duration: (p) => dur(HOLD + 1.0, 3.2, rows(p.stages).length, 8, 45), draw: drawWhatIfSim },
+    duration: (p) => dur(HOLD + 1.0, 3.2, rows(p.stages).length, 8, 45), draw: drawWhatIfSim,
+    cues: (p, D) => { const n = Math.max(1, rows(p.stages).length), st = (D - HOLD - 1.0) / n;
+      return [{ t: HOLD, k: "exit" }, ...Array.from({ length: n }, (_, i) => ({ t: HOLD + i * st, k: "stage", i }))]; } },
   { id: "day-timeline", name: "Day 1 → Day 10,000", brand: "ranthesim", pro: false, blurb: "A timeline that escalates, one beat at a time.",
     fields: [
       { key: "question", label: "The question", type: "text", def: "What if nobody slept for a week?" },
       { key: "lines", label: "Beats: 'When: what happens'", type: "textarea", def: "Day 1: Everyone is fine. Coffee sales spike.\nDay 3: Focus drops by a third.\nDay 5: Hallucinations are common.\nDay 7: Cities run on pure adrenaline." },
     ],
-    duration: (p) => dur(4, 4.5, rows(p.lines).length), draw: drawTimeline },
+    duration: (p) => dur(4, 3.6, rows(p.lines).length), draw: drawTimeline,
+    cues: (p, D) => { const n = Math.max(1, rows(p.lines).length), gap = (D - 2.0 - 1.2) / n;
+      return Array.from({ length: n }, (_, i) => ({ t: 0.4 + i * gap, k: "pop", i })); } },
   { id: "pov-chat", name: "POV Chat", brand: "sidecharpov", pro: false, blurb: "Our Side Character look: a POV tag + a group chat from the side character's phone, up to 6 messages.",
     fields: [
       { key: "pov", label: "POV tag", type: "text", def: "POV: you're the goose 🪿" },
@@ -317,21 +321,37 @@ export const TEMPLATES = [
       { key: "messages", label: "Messages, max 6: 'Name: text'. Start yours with 'me:'. Optional ' @3.5' = seconds in.", type: "textarea",
         def: "Duck: a jogger is on the path\nme: on it\nFrog: he's literally just jogging\nme: he made eye contact\nDuck: he's sprinting now\nme: you're welcome for the cardio @9.4" },
     ],
-    duration: chatDuration, draw: drawPovChat },
+    duration: chatDuration, draw: drawPovChat,
+    cues: (p) => { const ms = parseChat(p), ts = chatTimes(ms);
+      return ms.map((m, i) => ({ t: ts[i], k: m.me ? "send" : "recv", i, last: i === ms.length - 1 })); } },
   { id: "notif-stack", name: "Notification Stack", brand: "sidecharpov", pro: true, blurb: "Lock-screen notifications pile up. Pure chaos.",
     fields: [
       { key: "pov", label: "POV tag", type: "text", def: "POV: your phone at 3 a.m." },
       { key: "time", label: "Clock", type: "text", def: "3:07" },
       { key: "notifs", label: "Notifications ('App: text')", type: "textarea", def: "Mum: you up?\nBank: unusual activity detected\nGroup chat: 47 new messages\nCalendar: Meeting in 5 hours\nBattery: 1% remaining" },
     ],
-    duration: (p) => dur(3, 2.2, rows(p.notifs).length), draw: drawNotifs },
+    duration: (p) => dur(3, 2.2, rows(p.notifs).length), draw: drawNotifs,
+    cues: (p, D) => { const n = Math.max(1, rows(p.notifs).length), gap = (D - 1.0 - 1.4) / n;
+      return Array.from({ length: n }, (_, i) => ({ t: 0.6 + i * gap, k: "ding", i })); } },
   { id: "big-caption", name: "Big Caption", brand: "sidecharpov", pro: true, blurb: "Meme-native Anton captions that hit one at a time.",
     fields: [
       { key: "pov", label: "POV tag", type: "text", def: "POV: the other driver" },
       { key: "lines", label: "Captions (one per line)", type: "textarea", def: "Me, going the speed limit\nHim, doing it the hard way\nThe light was green for 11 seconds\nHe still hasn't moved" },
     ],
-    duration: (p) => dur(2.5, 2.4, rows(p.lines).length), draw: drawBigCaption },
+    duration: (p) => dur(2.5, 2.4, rows(p.lines).length), draw: drawBigCaption,
+    cues: (p, D) => { const n = Math.max(1, rows(p.lines).length), gap = (D - 1.0) / n;
+      return Array.from({ length: n }, (_, i) => ({ t: i * gap, k: "slam", i })); } },
 ];
+
+// Remix deep links: /make/?t=<template>&demo=<slug> preloads that demo's copy ("make this exact one"). `p` overrides the
+// template defaults; {} = the template's own default demo. Unknown slugs are ignored.
+export const DEMOS = {
+  goose: { t: "pov-chat", name: "Goose vs. jogger", p: {} },
+  moon: { t: "whatif-sim", name: "Moon 1 km closer every second", p: {} },
+  sleep: { t: "day-timeline", name: "Nobody slept for a week", p: {} },
+  phone3am: { t: "notif-stack", name: "Your phone at 3 a.m.", p: {} },
+  driver: { t: "big-caption", name: "The other driver", p: {} },
+};
 
 export function defaults(tpl) { return Object.fromEntries(tpl.fields.map((f) => [f.key, f.def])); }
 
