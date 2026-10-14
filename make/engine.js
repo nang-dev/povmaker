@@ -140,6 +140,60 @@ function simHero(ctx, t, w, hot, cam) {
   return [ox, oy];
 }
 const TAIL = 1.5; // contact hold: counter red + flash before the end card
+// ---- per-preset heroes for the 2D sim (Muse presets review): `hero` = sun | dots | atmosphere (default = the orbit-into-Earth) ----
+// All are pure functions of the counter, drawn in the 650-1250 hero band under the same camera push (cam).
+function heroSun(ctx, t, w, hot, cam) { // "commute": you fly in to a big amber Sun; the counter is the distance to it
+  const cx = 540, cy = 960;
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(cam, cam); ctx.translate(-cx, -cy);
+  ctx.strokeStyle = "rgba(61,214,245,.18)"; ctx.lineWidth = 2;
+  for (const r of [200, 320, 440]) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke(); }
+  const gl = ctx.createRadialGradient(cx, cy, 70, cx, cy, 400);
+  gl.addColorStop(0, "rgba(255,176,32,.5)"); gl.addColorStop(1, "rgba(255,176,32,0)");
+  ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(cx, cy, 400, 0, 7); ctx.fill();
+  const sr = 122 + 3 * Math.sin(t * 2.4), g = ctx.createRadialGradient(cx - 34, cy - 34, 10, cx, cy, sr + 10);
+  g.addColorStop(0, "#FFE2A0"); g.addColorStop(0.55, "#FFB020"); g.addColorStop(1, "#E07A00");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, sr, 0, 7); ctx.fill();
+  const orbR = 150 + 290 * (1 - w), ang = t * (0.5 + 0.9 * w) + 0.8, sq = 0.8 + 0.2 * w;
+  for (let i = 1; i <= 14; i++) {
+    const a = ang - i * 0.045;
+    ctx.fillStyle = `rgba(61,214,245,${0.34 * (1 - i / 14)})`;
+    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * orbR, cy + Math.sin(a) * orbR * sq, Math.max(2, 17 - i), 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = hot ? P.alert : P.cyan; ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * orbR, cy + Math.sin(ang) * orbR * sq, 18, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function heroDots(ctx, t, v, end, contact, ct, cam) { // "birthday": one dot per person pops in; at the end two flash amber and match
+  const cx = 540, cy = 960, COLS = 6, GAP = 118, n = Math.max(1, Math.round(end)), A = 6, B = Math.min(n - 1, 17);
+  const pos = (i) => [cx + ((i % COLS) - (COLS - 1) / 2) * GAP, cy + (Math.floor(i / COLS) - 1.5) * GAP];
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(cam, cam); ctx.translate(-cx, -cy);
+  for (let i = 0; i < n; i++) {
+    const k = easeBack(clamp(v - i)); if (k <= 0) continue;
+    const [x, y] = pos(i), m = contact && (i === A || i === B);
+    const a = contact && !m ? 0.28 : 0.9;
+    ctx.fillStyle = m ? P.amber : `rgba(61,214,245,${a})`;
+    ctx.beginPath(); ctx.arc(x, y, 30 * k * (m ? 1 + 0.18 * Math.sin(ct * 18) : 1), 0, 7); ctx.fill();
+    if (m) { ctx.strokeStyle = "rgba(255,176,32,.7)"; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(x, y, 46 + 34 * clamp(ct / 0.5), 0, 7); ctx.stroke(); }
+  }
+  if (contact) {
+    const [x1, y1] = pos(A), [x2, y2] = pos(B), k = clamp(ct / 0.35);
+    ctx.strokeStyle = P.amber; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 + (x2 - x1) * k, y1 + (y2 - y1) * k); ctx.stroke();
+  }
+  ctx.restore();
+}
+function heroAtmos(ctx, t, frac, hot, cam) { // "oxygen": Earth with a halo that thins to nothing as the counter runs down
+  const cx = 540, cy = 960;
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(cam, cam); ctx.translate(-cx, -cy);
+  const f = clamp(frac), th = 40 + 170 * f;
+  const g = ctx.createRadialGradient(cx, cy, 150, cx, cy, 150 + th);
+  g.addColorStop(0, `rgba(61,214,245,${(0.55 * f).toFixed(3)})`); g.addColorStop(1, "rgba(61,214,245,0)");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, 150 + th, 0, 7); ctx.fill();
+  ctx.strokeStyle = `rgba(61,214,245,${(0.35 * f).toFixed(3)})`; ctx.lineWidth = 3;
+  for (const k of [0.35, 0.7, 1]) { ctx.beginPath(); ctx.arc(cx, cy, 150 + th * k, 0, 7); ctx.stroke(); }
+  const e = ctx.createRadialGradient(cx - 40, cy - 40, 20, cx, cy, 170);
+  e.addColorStop(0, f > 0.02 ? "#5FA8D8" : "#6b7683"); e.addColorStop(1, f > 0.02 ? "#14304A" : "#2a3038");
+  ctx.fillStyle = e; ctx.beginPath(); ctx.arc(cx, cy, 150, 0, 7); ctx.fill();
+  ctx.restore();
+}
 function drawWhatIfSim(ctx, t, p, D) {
   const stages = rows(p.stages), n = Math.max(1, stages.length), tEnd = D - TAIL, run = tEnd - HOLD;
   const stageT = run / n;
@@ -154,7 +208,13 @@ function drawWhatIfSim(ctx, t, p, D) {
   const shake = contact && ct < 0.3 ? Math.sin(ct * 110) * 14 * (1 - ct / 0.3) : 0;
   const cam = 1 + 0.3 * clamp(t / tEnd);
   ctx.save(); ctx.translate(shake, shake * 0.5);
-  simBg(ctx, t); const [mx, my] = simHero(ctx, Math.min(t, tEnd), w, hit, cam);
+  const hero = String(p.hero || ""), endWord = String(p.endWord || "").trim().toUpperCase() || "CONTACT";
+  simBg(ctx, t);
+  let mx = 540, my = 960;
+  if (hero === "sun") heroSun(ctx, Math.min(t, tEnd), w, hit, cam);
+  else if (hero === "dots") heroDots(ctx, t, Math.abs(v - a), Math.abs(b - a), contact, ct, cam);
+  else if (hero === "atmosphere") heroAtmos(ctx, t, 1 - w, hit, cam);
+  else [mx, my] = simHero(ctx, Math.min(t, tEnd), w, hit, cam);
   if (contact && ct < 0.7) { // shockwave from the contact point
     ctx.save(); ctx.strokeStyle = `rgba(255,90,60,${0.7 * (1 - ct / 0.7)})`; ctx.lineWidth = 10;
     ctx.beginPath(); ctx.arc(540 + (mx - 540) * cam, 960 + (my - 960) * cam, 60 + ct * 1300, 0, 7); ctx.stroke(); ctx.restore();
@@ -170,7 +230,7 @@ function drawWhatIfSim(ctx, t, p, D) {
     ctx.save(); ctx.font = mono(24); track(ctx, 1.2); ctx.fillStyle = P.cyan; ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
     ctx.fillText(`▶▶ 1 S ≈ ${simSpan(per)}`, 940, 296); ctx.restore();
     const cb = RTS.drawCounter(ctx, fmt(v), { y: 320, size: 150, unit, label: lbl,
-      desc: contact ? "CONTACT" : `STAGE ${si + 1}/${n}`, color: hit ? P.alert : P.amber });
+      desc: contact ? endWord : `STAGE ${si + 1}/${n}`, color: hit ? P.alert : P.amber });
     if (String(p.rule || "").trim()) {
       ctx.save(); ctx.font = mono(28); track(ctx, 1.6); ctx.fillStyle = "rgba(242,244,247,.78)"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
       ctx.fillText(String(p.rule).toUpperCase(), 64, cb + 40, 876); ctx.restore();
@@ -559,20 +619,20 @@ export const DEMOS = {
   // whatif-sim remix presets from the QA-passed scripts (Atlas, shared/whatif/povmaker-presets.md). Loaded exactly as given.
   commute: { t: "whatif-sim", name: "Your commute went straight up", p: {
     premise: "Your commute went\nstraight up?", label: "Distance to the Sun", unit: "km", start: "149600000", end: "0", rate: "0.0277778",
-    tag: "Commute, straight up", rule: "Rule: 100 km/h, straight up · not rocket science", episode: "004",
+    tag: "Commute, straight up", rule: "Rule: 100 km/h, straight up · not rocket science", episode: "004", hero: "sun", endWord: "Arrived",
     stages: "Same speed. Different direction.\nPast the Moon's orbit.\nStill 100 km/h. Still going.\nPast Mars at its closest.\n171 years to the Sun. At 100 km/h." } },
   birthday: { t: "whatif-sim", name: "Strangers walked in until two shared a birthday", p: {
     premise: "Strangers walked in until\ntwo shared a birthday?", label: "In the room", unit: "people", start: "0", end: "23", rate: "1",
-    tag: "Birthday room", rule: "Rule: 365 days, no Feb 29", episode: "008",
-    stages: "One stranger per second.\nEach one meets everyone.\nPerson 5: a 2.7% chance.\nPerson 9: nearly 10%.\nBy person 23: over 50%. Keep watching." } },
+    tag: "Birthday room", rule: "Rule: 365 days, no Feb 29", episode: "008", hero: "dots", endWord: "Match",
+    stages: "One stranger per second.\nEach one meets everyone.\nPerson 5: a 2.7% chance.\nPerson 9: nearly 10%.\nBy person 23: a coin flip." } },
   carrington: { t: "whatif-sim", name: "The 1859 solar storm lit up your sky", p: {
     premise: "The 1859 solar storm\nlit up your sky\ntonight?", label: "Cloud distance to Earth", unit: "km", start: "149600000", end: "0", rate: "2361.11",
     tag: "1859 storm, tonight", rule: "Rule: 1859 timeline, replayed tonight", episode: "009",
     stages: "Light arrives: 8 minutes 19 seconds.\nNormal cloud: 3.5 days. This: 17.6 hours.\nPolar flights get rerouted.\nPast Mercury's orbit.\nImpact: 17.6 hours after the flare." } },
   oxygen: { t: "whatif-sim", name: "Earth lost 1% of its oxygen every second", p: {
     premise: "Earth lost 1% of its\noxygen every second?", label: "Oxygen left", unit: "%", start: "100", end: "0", rate: "1",
-    tag: "Earth loses 1% O2/s", rule: "Rule: 1% per second · not real chemistry", episode: "006",
-    stages: "Oxygen: 1% gone every second.\nFull to zero in 100 seconds.\nDenver's air. Barely noticeable.\nCandle's out. Air: ~16% oxygen.\nGas flames die. Air: 12% oxygen." } },
+    tag: "Earth loses 1% O2/s", rule: "Rule: 1% per second · not real chemistry", episode: "006", hero: "atmosphere", endWord: "Gone",
+    stages: "Oxygen drains every second.\nFull to zero in 100 seconds.\nDenver-thin air.\nCandles go out.\nGas flames die." } },
   moon3d: { t: "whatif-3d", name: "Moon 1 km closer (3D)", p: {} },
   sleep: { t: "day-timeline", name: "Nobody slept for a week", p: {} },
   phone3am: { t: "notif-stack", name: "Your phone at 3 a.m.", p: {} },
