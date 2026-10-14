@@ -343,7 +343,7 @@ export const TEMPLATES = [
       { key: "rate", label: "Counter speed in sim time (units per second; sets the HUD clock)", type: "number", def: "1" },
       { key: "tag", label: "Short tag (shows after the question)", type: "text", def: "Moon +1 km/s" },
       { key: "rule", label: "Rule line (optional)", type: "text", def: "Rule: 1 km/s · not real orbital physics" },
-      { key: "stages", label: "Captions, one per beat (one per line)", type: "textarea", def: "Tides start to climb\nCoastlines go under at dawn\nThe sky is mostly Moon\nThen it stops. Almost." },
+      { key: "stages", label: "Captions, one per beat (one per line)", type: "textarea", def: "Tides start to climb\nCoastlines go under at dawn\nThe sky is mostly Moon\nIt doesn't stop." },
       { key: "episode", label: "Sim number", type: "text", def: "001" },
     ],
     duration: (p) => dur(HOLD + TAIL, 3.2, rows(p.stages).length, 8, 45), draw: drawWhatIfSim, bg: (ctx, t) => simBg(ctx, t),
