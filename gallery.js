@@ -14,7 +14,12 @@
     var h = document.createElement("b"); h.textContent = t.title;
     var c = document.createElement("em"); c.textContent = t.cta;
     tx.appendChild(h); tx.appendChild(c); a.appendChild(im); a.appendChild(tx);
-    a.addEventListener("click", function () { if (window.POVTrack) window.POVTrack.track("gallery_click", { demo: t.demo, from: from }); });
+    a.addEventListener("click", function (e) {
+      if (window.POVTrack) window.POVTrack.track("gallery_click", { demo: t.demo, from: from });
+      // Same-tab navigation can cancel the beacon: hold the navigation ~200 ms so the event leaves first.
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+      e.preventDefault(); var h = a.href; setTimeout(function () { location.href = h; }, 200);
+    });
     strip.appendChild(a);
   });
   el.hidden = false;

@@ -178,9 +178,11 @@ $("export").onclick = async () => {
       (noAudio ? `<p class="muted">This browser can't put sound inside the MP4. <a download="povmaker-${use.id}.wav" href="${wav}">Download the sound (WAV)</a> and add it when you post (Instagram, TikTok and CapCut all take your own audio), or export on desktop Chrome / Safari 26 for a video with sound.</p>` : "");
     if (!state.pro) {
       bump(); setPro(false); setLimit("watermark");
-      const n = document.createElement("p"); n.className = "muted";
-      n.innerHTML = 'This free export carries a watermark and end card. Remove them: <a class="btn sec inline" data-checkout data-limit="watermark" href="../index.html#waitlist">Go Pro</a>';
+      const nT = TEMPLATES.filter((t) => !t.preview).length;
+      const n = document.createElement("div"); n.className = "box upsell"; n.style.marginTop = "12px";
+      n.innerHTML = `<b>Want this without the watermark?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports · ${nT} templates</p><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="after_export" href="../pricing.html">Go Pro</a> <span class="muted">14-day refund, cancel any time</span></p>`;
       $("out").appendChild(n); window.POVUpgrade && window.POVUpgrade.bind(n.querySelector("a"));
+      track("upsell_view", { where: "after_export", template: state.tpl.id });
     }
     msg.className = "msg ok";
     msg.textContent = "Done. Post it with the AI-generated label on." + (sound() && !blob.hasAudio ? " The video has no sound in this browser, but the sound is available below." : "") + (fell ? " 3D isn't available in this browser, so this export uses the 2D What If look." : "");

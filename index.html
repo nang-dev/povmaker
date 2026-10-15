@@ -37,7 +37,7 @@ document.documentElement.dataset.brand=/sidechar/.test(b)?"sidecharpov":"ranthes
     <p id="tagline" class="tagline">Make videos like these.</p>
     <p id="sub" class="sub">Type a "what if" or a meme POV. Get a vertical video in seconds.</p>
     <a id="cta" class="btn primary" href="make/" data-track="cta_click">Make a video free</a>
-    <a class="btn sec" data-checkout href="#waitlist" id="pro-cta">Get Pro · $9/mo</a>
+    <a class="btn sec" data-checkout data-limit="home_hero" href="pricing.html" id="pro-cta">Get Pro · $9/mo</a>
   </header>
 
   <section aria-labelledby="latest-h">
@@ -45,14 +45,10 @@ document.documentElement.dataset.brand=/sidechar/.test(b)?"sidecharpov":"ranthes
     <ul id="videos" class="videos"><li class="muted">First videos landing soon.</li></ul>
   </section>
 
-  <section id="waitlist" aria-labelledby="wl-h">
-    <h2 id="wl-h">Join the waitlist</h2>
-    <p class="muted">Early members get Pro at a launch discount. No spam, one email when it opens.</p>
-    <form id="wl-form" novalidate>
-      <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required aria-label="Email">
-      <button class="btn primary" type="submit">Join by email</button>
-    </form>
-    <p id="wl-msg" class="msg" role="status" aria-live="polite"></p>
+  <section id="pro" aria-labelledby="pro-h">
+    <h2 id="pro-h">Pro is live, $9/mo</h2>
+    <p class="muted">No watermark or end card · up to 45 s · 60 fps · unlimited exports · all 7 templates. 14-day refund.</p>
+    <p><a class="btn primary" data-checkout data-limit="home_pro" href="pricing.html">Get Pro · $9/mo</a></p>
   </section>
 
   <nav id="socials" class="socials" aria-label="Follow us"></nav>

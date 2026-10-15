@@ -50,7 +50,11 @@
         li.className = "vwrap";
         var mk = document.createElement("a"); mk.className = "vmk"; mk.textContent = v.make.cta;
         mk.href = "make/?demo=" + encodeURIComponent(v.make.demo) + "&utm_source=bio&utm_medium=latest&utm_campaign=" + encodeURIComponent(brandKey) + "&utm_content=" + encodeURIComponent(v.make.demo);
-        mk.addEventListener("click", function () { if (window.POVTrack) window.POVTrack.track("gallery_click", { demo: v.make.demo, from: "bio_latest" }); });
+        mk.addEventListener("click", function (e) {
+          if (window.POVTrack) window.POVTrack.track("gallery_click", { demo: v.make.demo, from: "bio_latest" });
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+          e.preventDefault(); var h = mk.href; setTimeout(function () { location.href = h; }, 200); // let the beacon leave first
+        });
         li.appendChild(mk);
       }
       ul.appendChild(li);
@@ -62,7 +66,7 @@
   });
 
   var form = $("wl-form"), msg = $("wl-msg");
-  form.addEventListener("submit", function (e) {
+  if (form) form.addEventListener("submit", function (e) {
     e.preventDefault();
     var email = $("email").value.trim();
     msg.className = "msg";
