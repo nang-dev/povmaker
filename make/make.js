@@ -31,13 +31,43 @@ const inAppName = (() => {
   if (/musical_ly|ByteLocale|BytedanceWebview/i.test(UA)) return "tiktok";
   return "";
 })();
-function showInAppBanner() {
+// Feature-detect (don't UA-sniff) whether this webview can actually hand back a saved file.
+function canShareFiles() {
+  try {
+    const f = new File([""], "t.mp4", { type: "video/mp4" });
+    return !!(navigator.canShare && navigator.canShare({ files: [f] }));
+  } catch { return false; }
+}
+// Round-trip URL: same template + edited field values, so opening in Safari reopens this exact project.
+function projectUrl() {
+  const u = new URL(location.href);
+  u.searchParams.delete("demo"); u.searchParams.set("t", state.tpl.id);
+  Object.keys(state.params).forEach((k) => u.searchParams.set("p_" + k, state.params[k]));
+  return u.toString();
+}
+// The one and only in-app-blocked state: hides the dead Export button (no point showing a primary CTA
+// that can't work) and replaces it with the single working action — Copy link, open in Safari.
+function showInAppExportBlocked() {
+  const msg = $("expmsg");
+  if (msg.dataset.blocked) return; // already shown; don't re-render or double-track
+  msg.dataset.blocked = "1";
   const btn = $("export");
-  if (!btn || $("inappbanner")) return;
-  const n = document.createElement("p");
-  n.id = "inappbanner"; n.className = "msg err"; n.style.textAlign = "center";
-  n.textContent = "This app's browser can't save videos. Tap ••• (or the menu icon) → Open in browser, then export.";
-  btn.parentNode.insertBefore(n, btn);
+  // .btn{display:block} in style.css outranks the UA [hidden] rule at equal specificity (author
+  // stylesheet beats user-agent stylesheet), so the `hidden` attribute alone wouldn't hide it.
+  if (btn) { btn.style.display = "none"; btn.disabled = true; }
+  $("prog").hidden = true;
+  msg.className = "msg err";
+  msg.innerHTML = `<b>This app's browser can't save videos. Open in Safari to export →</b><br>` +
+    `<button id="copylinkbtn" class="btn primary" type="button" style="margin-top:8px">Copy link</button><br>` +
+    `<span class="muted">Tap ••• (or the menu icon) → Open in browser</span>`;
+  const linkBtn = $("copylinkbtn");
+  // projectUrl() is read at click time, not here: this banner renders once on load, well before
+  // the visitor has edited any field, so the URL has to be built fresh with whatever they've typed so far.
+  linkBtn.onclick = async () => {
+    try { await navigator.clipboard.writeText(projectUrl()); linkBtn.textContent = "Copied!"; }
+    catch { linkBtn.textContent = "Couldn't copy — select the address bar instead"; }
+  };
+  track("export_blocked_inapp", { ua_app: inAppName });
 }
 // Which free limit the visitor just hit; upgrade.js reads it so upgrade_click carries `limit` (also on pricing.html).
 const setLimit = (l) => { try { sessionStorage.setItem("povmaker.limit", JSON.stringify({ l, t: Date.now() })); } catch {} };
@@ -138,9 +168,16 @@ function buildTemplates() {
   });
   sel.value = cur;
 }
+// p_<key>=<value> round-tripped from the in-app-blocked interstitial (see projectUrl); applied once, to the template it was saved for.
+let pOverrides = (() => {
+  const o = {}; for (const [k, v] of q.entries()) if (k.startsWith("p_")) o[k.slice(2)] = v;
+  return Object.keys(o).length ? o : null;
+})();
 function buildFields() {
   const f = $("fields"); f.innerHTML = ""; $("blurb").textContent = state.tpl.blurb;
-  state.params = { ...defaults(state.tpl), ...(state.demo && state.demo.t === state.tpl.id ? state.demo.p : {}) };
+  const fromUrl = pOverrides && q.get("t") === state.tpl.id ? pOverrides : null;
+  state.params = { ...defaults(state.tpl), ...(state.demo && state.demo.t === state.tpl.id ? state.demo.p : {}), ...fromUrl };
+  if (fromUrl) pOverrides = null; // only replay once, so switching templates afterwards doesn't re-apply stale values
   state.tpl.fields.forEach((fd) => {
     const l = document.createElement("label"); l.textContent = fd.label; l.htmlFor = "f-" + fd.key; f.appendChild(l);
     const el = document.createElement(fd.type === "textarea" ? "textarea" : fd.type === "select" ? "select" : "input");
@@ -176,6 +213,7 @@ $("export").onclick = async () => {
   const msg = $("expmsg"), prog = $("prog");
   msg.className = "msg";
   track("export_start", { template: state.tpl.id, ua: inAppName || "browser" });
+  if (inAppName && !canShareFiles()) { showInAppExportBlocked(); return; }
   if (state.tpl.pro && !state.pro) { blocked("template_locked", msg, 'This template is Pro. <a data-limit="template_locked" href="../pricing.html">See pricing</a> or enter your licence key.'); return; }
   const D = state.tpl.duration(state.params);
   if (!state.pro && D > FREE_MAX_S + 1e-6) { blocked("length_cap", msg, `Free exports are limited to ${FREE_MAX_S} s (this one is ${D.toFixed(1)} s). Remove a beat, or <a data-limit="length_cap" href="../pricing.html">go Pro</a> for up to ${PRO_MAX_S} s.`, { secs: Math.round(D) }); return; }
@@ -212,6 +250,11 @@ $("export").onclick = async () => {
           track("export_error", { msg: "share_failed: " + (e && e.message || e), ua: inAppName || "browser" });
           const a = document.createElement("a"); a.className = "btn primary"; a.download = filename; a.href = url; a.textContent = "Download MP4";
           $("sharebtn").replaceWith(a);
+          if (inAppName) {
+            const hint = document.createElement("p"); hint.className = "muted"; hint.style.marginTop = "6px";
+            hint.textContent = "If that didn't save, tap ••• (or the menu icon) → Open in browser, then export again.";
+            a.insertAdjacentElement("afterend", hint);
+          }
         }
       };
     }
@@ -247,4 +290,4 @@ buildTemplates(); buildFields(); checkLicence();
 if (state.tpl.id === "whatif-3d") ensure3D();
 requestAnimationFrame(tick);
 track("visit_make", { template: state.tpl.id, demo: state.demo ? demoSlug : "", source: (JSON.parse(localStorage.getItem("utm") || "{}").utm_source) || "direct" });
-if (inAppName) { track("inapp", { app: inAppName }); showInAppBanner(); }
+if (inAppName) { track("inapp", { app: inAppName }); if (!canShareFiles()) showInAppExportBlocked(); }
