@@ -45,7 +45,15 @@
       if (v.thumb) { var im = document.createElement("img"); im.src = v.thumb; im.alt = ""; im.width = 45; im.height = 80; im.loading = "lazy"; a.appendChild(im); }
       var t = document.createElement("span"); t.className = "vt"; t.textContent = v.title; a.appendChild(t);
       if (v.tag) { var g = document.createElement("span"); g.className = "tag"; g.textContent = v.tag; a.appendChild(g); }
-      li.appendChild(a); ul.appendChild(li);
+      li.appendChild(a);
+      if (v.make) { // second action inside the tile (Muse #3010): the title opens the reel, this line opens the editor on the matching preset
+        li.className = "vwrap";
+        var mk = document.createElement("a"); mk.className = "vmk"; mk.textContent = v.make.cta;
+        mk.href = "make/?demo=" + encodeURIComponent(v.make.demo) + "&utm_source=bio&utm_medium=latest&utm_campaign=" + encodeURIComponent(brandKey) + "&utm_content=" + encodeURIComponent(v.make.demo);
+        mk.addEventListener("click", function () { if (window.POVTrack) window.POVTrack.track("gallery_click", { demo: v.make.demo, from: "bio_latest" }); });
+        li.appendChild(mk);
+      }
+      ul.appendChild(li);
     });
   }
   (C.socials || []).forEach(function (s) {

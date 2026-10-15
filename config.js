@@ -23,6 +23,15 @@ window.SITE_CONFIG = {
   lsStoreId: "", // Lemon Squeezy store id (Settings > Stores); licence keys from other stores are rejected
   lsProductId: "", // optional: POVMaker Pro product id (strict licence check)
   gumroadProductId: "hFwO80Xuaa5EjkGxut-OmQ==", // Gumroad product id (needed by the licence verify API; only used when provider = "gumroad")
+  // Gallery tiles (gallery.js): our real posted Shorts -> the matching /make/ ?demo= preset. Order = tile order.
+  gallery: [
+    { demo: "moon3d", title: "What if the Moon got 1 km closer every second?", thumb: "thumbs/moon.jpg", cta: "Make a simpler 3D version of this one, free →" },
+    { demo: "oxygen", title: "What if oxygen dropped 1% every second?", thumb: "thumbs/oxygen.jpg", cta: "Make a simpler 2D version of this one, free →" },
+    { demo: "goose", title: "POV: you're the goose", thumb: "thumbs/goose.jpg", cta: "Make a simpler chat version of this one, free →" },
+    { demo: "hand", title: "POV: you're his car", thumb: "thumbs/car.jpg", cta: "Make a simpler version of this one, free →" },
+    { demo: "driver", title: "LOSER #1: you're the driver", thumb: "thumbs/driver.jpg", cta: "Make a simpler version of this one, free →" },
+    // { demo: "commute", title: "What if your commute went straight up?", thumb: "thumbs/commute.jpg", cta: "Make a simpler 2D version of this one, free →" }, // enable once SIM #004 is posted
+  ],
   defaultBrand: "ranthesim",
   // One page, brand picked by ?brand= or utm_campaign=. Bio links: /?utm_source=instagram&utm_campaign=ranthesim
   brands: {
@@ -30,14 +39,14 @@ window.SITE_CONFIG = {
       title: "Ran The Sim",
       tagline: "What if…? We ran the sim.",
       sub: "Real numbers. Simulated worlds. New sims every day.",
-      cta: "Make videos like this → POVMaker",
+      cta: "Make your own What If video, free →",
       socials: [
         // { label: "TikTok", url: "https://www.tiktok.com/@ranthesim" },
       ],
       videos: [
         // { title, url, thumb (frame 0, thumbs/*.jpg) }. Order = Muse's top 3 by views (#2828).
-        { title: "What if the Moon got 1 km closer every second?", url: "https://www.instagram.com/reel/Ded_OL-lPc-/", thumb: "thumbs/moon.jpg" },
-        { title: "What if oxygen dropped 1% every second?", url: "https://www.instagram.com/ranthesim/reel/DefWy1EiZi9/", thumb: "thumbs/oxygen.jpg" },
+        { title: "What if the Moon got 1 km closer every second?", url: "https://www.instagram.com/reel/Ded_OL-lPc-/", thumb: "thumbs/moon.jpg", make: { demo: "moon3d", cta: "Make a simpler 3D version of this one, free →" } },
+        { title: "What if oxygen dropped 1% every second?", url: "https://www.instagram.com/ranthesim/reel/DefWy1EiZi9/", thumb: "thumbs/oxygen.jpg", make: { demo: "oxygen", cta: "Make a simpler 2D version of this one, free →" } },
         { title: "What if zombies broke out across the US?", url: "https://www.instagram.com/reel/DeeqEysjawm/", thumb: "thumbs/zombies.jpg" },
       ],
     },
@@ -48,8 +57,8 @@ window.SITE_CONFIG = {
       cta: "Make your own POV → POVMaker",
       socials: [],
       videos: [
-        { title: "POV: you're his car", url: "https://www.instagram.com/reel/DefiKD_iii-/", thumb: "thumbs/car.jpg" },
-        { title: "POV: you're the goose", url: "https://www.instagram.com/reel/DeeI4vPj4ye/", thumb: "thumbs/goose.jpg" },
+        { title: "POV: you're his car", url: "https://www.instagram.com/reel/DefiKD_iii-/", thumb: "thumbs/car.jpg", make: { demo: "hand", cta: "Make a simpler version of this one, free →" } },
+        { title: "POV: you're the goose", url: "https://www.instagram.com/reel/DeeI4vPj4ye/", thumb: "thumbs/goose.jpg", make: { demo: "goose", cta: "Make a simpler chat version of this one, free →" } },
         { title: "POV: you're the worm", url: "https://www.instagram.com/reel/DeedfJ7kcad/", thumb: "thumbs/worm.jpg" },
       ],
     },

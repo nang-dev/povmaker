@@ -53,7 +53,20 @@ function setPro(on, msg) {
   $("keymsg").textContent = msg || "";
   $("keymsg").className = "msg" + (msg ? " err" : "");
   buildTemplates();
+  updateBar();
 }
+// Always-visible Pro bar + the preview watermark note (CEO #2941 A). Counts and caps come from the same constants/state the export uses.
+const checkoutHref = () => (window.SITE_CONFIG || {}).paymentUrl || "";
+function updateBar() {
+  const bar = $("probar"), note = $("wmnote"), href = checkoutHref();
+  const show = !state.pro && !!href;
+  bar.hidden = !show; note.hidden = !show;
+  if (!show) return;
+  $("pbn").textContent = left() + "/" + FREE_PER_DAY;
+  $("probarlink").href = href; $("wmlink").href = href;
+}
+$("probarlink").addEventListener("click", () => track("upgrade_click", { page: "make", checkout: "live", limit: "bar", exports_left: left() }));
+$("wmlink").addEventListener("click", () => track("upgrade_click", { page: "make", checkout: "live", limit: "watermark_preview" }));
 $("activate").onclick = async () => {
   const key = $("key").value.trim(); if (!key) return;
   $("keymsg").className = "msg"; $("keymsg").textContent = "Checking…";
