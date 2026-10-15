@@ -47,7 +47,11 @@ window.SITE_CONFIG = {
       sub: "Whose POV next? Comment it.",
       cta: "Make your own POV → POVMaker",
       socials: [],
-      videos: [],
+      videos: [
+        { title: "POV: you're his car", url: "https://www.instagram.com/reel/DefiKD_iii-/", thumb: "thumbs/car.jpg" },
+        { title: "POV: you're the goose", url: "https://www.instagram.com/reel/DeeI4vPj4ye/", thumb: "thumbs/goose.jpg" },
+        { title: "POV: you're the worm", url: "https://www.instagram.com/reel/DeedfJ7kcad/", thumb: "thumbs/worm.jpg" },
+      ],
     },
   },
 };

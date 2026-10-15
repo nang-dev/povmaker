@@ -7,7 +7,7 @@ a{color:var(--fg)}
 .wrap{max-width:480px;margin:0 auto;padding:max(24px,env(safe-area-inset-top)) 20px 40px}
 .hero{text-align:center;padding:24px 0 8px}
 .logo{width:72px;height:72px;margin:0 auto 16px;display:grid;place-items:center}
-html[data-brand=ranthesim] .logo{font:700 30px "JetBrains Mono",monospace;color:var(--acc);border:2px solid var(--line);border-radius:6px;background:var(--bg)}
+html[data-brand=ranthesim] .logo{width:fit-content;min-width:72px;padding:0 14px;white-space:nowrap;font:700 26px "JetBrains Mono",monospace;color:var(--acc);border:2px solid var(--line);border-radius:6px;background:var(--bg)}
 html[data-brand=ranthesim] .logo::before{content:"[ ▶ ]"}
 html[data-brand=sidecharpov] .logo{font:26px var(--hfont);background:var(--acc);color:#111;transform:rotate(-6deg);border-radius:8px;width:96px;height:56px;margin-bottom:24px}
 html[data-brand=sidecharpov] .logo::before{content:"POV:"}
