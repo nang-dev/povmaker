@@ -17,10 +17,28 @@ const ensure3D = () => g3p || (g3p = (async () => {
     const m = await import("./scene3d.bundle.js"); set3D(m.createScene3D()); set3DRes(1280); return true;
   } catch (e) { console.warn("3D unavailable", e); return false; }
 })());
-const state = { tpl: TEMPLATES[0], demo: null, params: {}, playing: true, safe: false, pro: false, t0: performance.now() };
+const state = { tpl: TEMPLATES[0], demo: null, params: {}, playing: true, safe: false, pro: false, t0: performance.now(), editedOnce: false };
 
 // ---- tracking: none on a static host; UTMs ride along to checkout (see bio page) ----
 const track = (name, data) => window.POVTrack && window.POVTrack.track(name, data);
+
+// ---- in-app browser detection (Instagram/Facebook/Threads/TikTok webviews often can't save files) ----
+const UA = navigator.userAgent || "";
+const inAppName = (() => {
+  if (/\bInstagram\b/i.test(UA)) return "instagram";
+  if (/FBAN|FBAV/i.test(UA)) return "facebook";
+  if (/\bBarcelona\b/i.test(UA)) return "threads";
+  if (/musical_ly|ByteLocale|BytedanceWebview/i.test(UA)) return "tiktok";
+  return "";
+})();
+function showInAppBanner() {
+  const btn = $("export");
+  if (!btn || $("inappbanner")) return;
+  const n = document.createElement("p");
+  n.id = "inappbanner"; n.className = "msg err"; n.style.textAlign = "center";
+  n.textContent = "This app's browser can't save videos. Tap ••• (or the menu icon) → Open in browser, then export.";
+  btn.parentNode.insertBefore(n, btn);
+}
 // Which free limit the visitor just hit; upgrade.js reads it so upgrade_click carries `limit` (also on pricing.html).
 const setLimit = (l) => { try { sessionStorage.setItem("povmaker.limit", JSON.stringify({ l, t: Date.now() })); } catch {} };
 const blocked = (limit, msg, html, extra = {}) => {
@@ -128,7 +146,10 @@ function buildFields() {
     const el = document.createElement(fd.type === "textarea" ? "textarea" : fd.type === "select" ? "select" : "input");
     if (fd.type === "select") fd.options.forEach(([v, n]) => { const o = document.createElement("option"); o.value = v; o.textContent = n; el.appendChild(o); });
     el.id = "f-" + fd.key; el.value = state.params[fd.key]; if (fd.type === "number") el.inputMode = "numeric";
-    el.oninput = () => { state.params[fd.key] = el.value; state.t0 = performance.now(); queuePreview(); };
+    el.oninput = () => {
+      state.params[fd.key] = el.value; state.t0 = performance.now(); queuePreview();
+      if (!state.editedOnce) { state.editedOnce = true; track("first_edit", { template: state.tpl.id }); }
+    };
     f.appendChild(el);
   });
   document.documentElement.dataset.brand = state.tpl.brand;
@@ -154,6 +175,7 @@ function tick(now) {
 $("export").onclick = async () => {
   const msg = $("expmsg"), prog = $("prog");
   msg.className = "msg";
+  track("export_start", { template: state.tpl.id, ua: inAppName || "browser" });
   if (state.tpl.pro && !state.pro) { blocked("template_locked", msg, 'This template is Pro. <a data-limit="template_locked" href="../pricing.html">See pricing</a> or enter your licence key.'); return; }
   const D = state.tpl.duration(state.params);
   if (!state.pro && D > FREE_MAX_S + 1e-6) { blocked("length_cap", msg, `Free exports are limited to ${FREE_MAX_S} s (this one is ${D.toFixed(1)} s). Remove a beat, or <a data-limit="length_cap" href="../pricing.html">go Pro</a> for up to ${PRO_MAX_S} s.`, { secs: Math.round(D) }); return; }
@@ -174,8 +196,25 @@ $("export").onclick = async () => {
     const url = URL.createObjectURL(blob);
     const wantSound = sound(), noAudio = wantSound && !blob.hasAudio;
     const wav = noAudio ? URL.createObjectURL(bedWav(use, par, { endCard: !state.pro })) : "";
-    $("out").innerHTML = `<video src="${url}" controls loop playsinline></video><p><a class="btn primary" download="povmaker-${use.id}.mp4" href="${url}">Download MP4</a></p>` +
+    const filename = `povmaker-${use.id}.mp4`;
+    const file = new File([blob], filename, { type: blob.type || "video/mp4" });
+    let canShareFile = false;
+    try { canShareFile = !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch { canShareFile = false; }
+    $("out").innerHTML = `<video src="${url}" controls loop playsinline></video><p>` +
+      (canShareFile ? `<button id="sharebtn" class="btn primary" type="button">Save / share video</button>` : `<a class="btn primary" download="${filename}" href="${url}">Download MP4</a>`) +
+      `</p>` +
       (noAudio ? `<p class="muted">This browser can't put sound inside the MP4. <a download="povmaker-${use.id}.wav" href="${wav}">Download the sound (WAV)</a> and add it when you post (Instagram, TikTok and CapCut all take your own audio), or export on desktop Chrome / Safari 26 for a video with sound.</p>` : "");
+    if (canShareFile) {
+      $("sharebtn").onclick = async () => {
+        try { await navigator.share({ files: [file], title: "POVMaker video" }); }
+        catch (e) {
+          if (e && e.name === "AbortError") return; // user cancelled the share sheet, not an error
+          track("export_error", { msg: "share_failed: " + (e && e.message || e), ua: inAppName || "browser" });
+          const a = document.createElement("a"); a.className = "btn primary"; a.download = filename; a.href = url; a.textContent = "Download MP4";
+          $("sharebtn").replaceWith(a);
+        }
+      };
+    }
     if (!state.pro) {
       bump(); setPro(false); setLimit("watermark");
       const nT = TEMPLATES.filter((t) => !t.preview).length;
@@ -187,7 +226,10 @@ $("export").onclick = async () => {
     msg.className = "msg ok";
     msg.textContent = "Done. Post it with the AI-generated label on." + (sound() && !blob.hasAudio ? " The video has no sound in this browser, but the sound is available below." : "") + (fell ? " 3D isn't available in this browser, so this export uses the 2D What If look." : "");
     track("export_done", { template: state.tpl.id, rendered: use.id, pro: state.pro ? 1 : 0, secs: Math.round(D), audio: blob.hasAudio ? 1 : 0, demo: state.demo ? q.get("demo") : "" });
-  } catch (e) { msg.className = "msg err"; msg.textContent = e.message || "Export failed."; }
+  } catch (e) {
+    msg.className = "msg err"; msg.textContent = e.message || "Export failed.";
+    track("export_error", { msg: String((e && e.message) || e).slice(0, 200), ua: inAppName || "browser", template: use.id });
+  }
   finally { $("export").disabled = false; prog.hidden = true; if (get3D()) set3DRes(1280); }
 };
 
@@ -205,3 +247,4 @@ buildTemplates(); buildFields(); checkLicence();
 if (state.tpl.id === "whatif-3d") ensure3D();
 requestAnimationFrame(tick);
 track("visit_make", { template: state.tpl.id, demo: state.demo ? demoSlug : "", source: (JSON.parse(localStorage.getItem("utm") || "{}").utm_source) || "direct" });
+if (inAppName) { track("inapp", { app: inAppName }); showInAppBanner(); }
