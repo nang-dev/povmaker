@@ -42,8 +42,9 @@
     C.videos.forEach(function (v) {
       var li = document.createElement("li"), a = document.createElement("a");
       a.href = v.url; a.rel = "noopener"; a.target = "_blank";
-      a.addEventListener("click", function () { send("/track", { event: "video_click" }); });
-      var t = document.createElement("span"); t.textContent = v.title; a.appendChild(t);
+      a.addEventListener("click", function () { send("/track", { event: "video_click" }); if (window.POVTrack) window.POVTrack.track("video_click", { title: v.title }); });
+      if (v.thumb) { var im = document.createElement("img"); im.src = v.thumb; im.alt = ""; im.width = 45; im.height = 80; im.loading = "lazy"; a.appendChild(im); }
+      var t = document.createElement("span"); t.className = "vt"; t.textContent = v.title; a.appendChild(t);
       if (v.tag) { var g = document.createElement("span"); g.className = "tag"; g.textContent = v.tag; a.appendChild(g); }
       li.appendChild(a); ul.appendChild(li);
     });

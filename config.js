@@ -35,7 +35,10 @@ window.SITE_CONFIG = {
         // { label: "TikTok", url: "https://www.tiktok.com/@ranthesim" },
       ],
       videos: [
-        // { title: "What if the Moon vanished?", url: "https://...", tag: "SIM #001" },
+        // { title, url, thumb (frame 0, thumbs/*.jpg) }. Order = Muse's top 3 by views (#2828).
+        { title: "What if the Moon got 1 km closer every second?", url: "https://www.instagram.com/reel/Ded_OL-lPc-/", thumb: "thumbs/moon.jpg" },
+        { title: "What if oxygen dropped 1% every second?", url: "https://www.instagram.com/ranthesim/reel/DefWy1EiZi9/", thumb: "thumbs/oxygen.jpg" },
+        { title: "What if zombies broke out across the US?", url: "https://www.instagram.com/reel/DeeqEysjawm/", thumb: "thumbs/zombies.jpg" },
       ],
     },
     sidecharpov: {
