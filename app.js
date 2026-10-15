@@ -26,7 +26,6 @@
   var B = (C.brands || {})[brandKey] || {};
   C.videos = B.videos || []; C.socials = B.socials || [];
   if (utm.utm_campaign === "none") utm.utm_campaign = brandKey; // ?brand= without UTMs
-  if (B.title) document.title = B.title + " · make videos like ours";
   $("title").textContent = B.title || $("title").textContent;
   $("tagline").textContent = B.tagline || $("tagline").textContent;
   if (B.sub) $("sub").textContent = B.sub;

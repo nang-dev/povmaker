@@ -41,3 +41,5 @@ input:focus{outline:2px solid var(--acc)}
 .price{font:800 28px var(--font)}
 .tier ul{padding-left:18px;margin:10px 0 0}
 .tagline{font-weight:700;font-size:18px;margin:0 0 6px}
+.cmp{width:100%;border-collapse:collapse;font-size:14px;margin:6px 0}.cmp th,.cmp td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}.cmp th{color:var(--mut);font-weight:600}
+.page .videos{margin:8px 0}.page .videos a{justify-content:flex-start}.page figure{margin:16px 0}.page video{max-width:100%;height:auto;border-radius:10px;background:#000}
