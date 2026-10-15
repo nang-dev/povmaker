@@ -1092,7 +1092,7 @@ export const DEMOS = {
     stages: "Oxygen drains every second.\nFull to zero in 100 seconds.\nDenver-thin air.\nCandles go out.\nGas flames die." } },
   // SIM #021 Moon farther (Hype #3203, counters = shared/scripts/2026-10-15-moon-farther-021.counters.json, Atlas). HELD until Muse GO + the Short is live.
   // curve = Moon km vs run progress from the counters (u = t/52 s); stages are the video's pinned captions (each true at its start: ocean 100 C at T+3m26s, oceans gone T+22m47s, day 26.5 h / 41.1 h, lock at 554,392 km).
-  moonfar: { hold: true, t: "whatif-sim", name: "The Moon moved 1 km farther every second", p: {
+  moonfar: { t: "whatif-sim", name: "The Moon moved 1 km farther every second", p: {
     premise: "THE MOON MOVED 1 KM\nFARTHER EVERY SECOND?", label: "DISTANCE TO THE MOON", unit: "km", start: "384400", end: "554392", rate: "1",
     tag: "MAKE YOUR OWN MOON SIM", episode: "none", rule: "Rule: 1 km/s · not real orbital physics", hero: "recede", endWord: "Locked",
     curve: "0:0,0.0673:0.00047,0.1731:0.00121,0.2308:0.00272,0.2885:0.00424,0.4038:0.00804,0.4423:0.03718,0.5048:0.08757,0.5577:0.14271,0.6346:0.16583,0.7115:0.18894,0.8077:0.40153,0.8462:0.48657,0.8846:0.86312,0.9423:0.98345,1:1",
