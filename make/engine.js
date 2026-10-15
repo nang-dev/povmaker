@@ -532,6 +532,16 @@ function c3(ctx, x, y, s, d, t) { // the ant cube: a dark brown block with a spe
     ctx.fillRect(x + a * s + wob, y + d + b * s, 3, 3);
   }
 }
+// Shared with the free-cap preview marker (make.js) so the HUD number it quotes at t=20s is never out of
+// sync with what the counter itself actually shows at that instant.
+function simValueAt(p, D, t) {
+  const { tEnd } = stagePlan(p, D);
+  const curve = String(p.curve || "").split(",").map((x) => x.split(":").map(Number)).filter((x) => x.length === 2 && x.every(Number.isFinite));
+  const lin = String(p.ease || "") === "linear" || curve.length > 1;
+  const u = clamp(t / tEnd);
+  const a = num(p.start, 0), b = num(p.end, 1e6);
+  return a + (b - a) * (curve.length > 1 ? curveAt(curve, u) : lin ? u : Math.pow(u, 2.2));
+}
 function drawWhatIfSim(ctx, t, p, D) {
   const { texts: stages, starts, n, tEnd } = stagePlan(p, D);
   let si = -1; for (let i = 0; i < n; i++) if (t >= starts[i] - 1e-9) si = i;
@@ -541,7 +551,7 @@ function drawWhatIfSim(ctx, t, p, D) {
   const contact = t >= tEnd, ct = t - tEnd;
   const hit = (si >= 0 && sT < 0.35) || contact;
   const u = clamp(t / tEnd);
-  const a = num(p.start, 0), b = num(p.end, 1e6), v = a + (b - a) * (curve.length > 1 ? curveAt(curve, u) : lin ? u : Math.pow(u, 2.2));
+  const a = num(p.start, 0), b = num(p.end, 1e6), v = simValueAt(p, D, t);
   const w = b === a ? 1 : clamp((v - a) / (b - a));
   const rate = Math.max(1e-9, num(p.rate, 1)), simS = Math.abs(v - a) / rate;
   const shake = contact && !calm && ct < 0.3 ? Math.sin(ct * 110) * 14 * (1 - ct / 0.3) : 0;
@@ -1037,6 +1047,7 @@ export const TEMPLATES = [
       { key: "episode", label: "Sim number", type: "text", def: "001" },
     ],
     duration: (p) => { const L = num(p.len, 0); if (L > 0) return clamp(L, 8, 60); const n = rows(p.stages).length; return dur(HOLD + TAIL, n <= 4 ? 3.2 : Math.max(2.6, Math.min(3.2, 15.5 / n)), n, 8, 45); }, draw: drawWhatIfSim, bg: (ctx, t) => simBg(ctx, t),
+    valueAt: simValueAt,
     cues: (p, D) => { const sp = stagePlan(p, D);
       return [{ t: HOLD, k: "exit" }, ...sp.starts.map((t, i) => ({ t, k: "stage", i })), { t: sp.tEnd, k: "hit" }]; } },
   { id: "day-timeline", name: "Day 1 → Day 10,000", brand: "ranthesim", pro: false, blurb: "A timeline that escalates, one beat at a time.",
@@ -1125,6 +1136,7 @@ export const DEMOS = {
   oxygen: { t: "whatif-sim", name: "Earth lost 1% of its oxygen every second", p: {
     premise: "Earth lost 1% of its\noxygen every second?", label: "Oxygen left", unit: "%", start: "100", end: "0", rate: "1",
     tag: "Earth loses 1% O2/s", rule: "Rule: 1% per second · not real chemistry", episode: "006", hero: "atmosphere", endWord: "Gone",
+    len: "35", tail: "2", // CEO #4609: full arc; free cuts off at 20s, well before 0%
     stages: "Oxygen drains every second.\nFull to zero in 100 seconds.\nDenver-thin air.\nCandles go out.\nGas flames die." } },
   // SIM #021 Moon farther (Hype #3203, counters = shared/scripts/2026-10-15-moon-farther-021.counters.json, Atlas). HELD until Muse GO + the Short is live.
   // curve = Moon km vs run progress from the counters (u = t/52 s); stages are the video's pinned captions (each true at its start: ocean 100 C at T+3m26s, oceans gone T+22m47s, day 26.5 h / 41.1 h, lock at 554,392 km).
@@ -1132,18 +1144,18 @@ export const DEMOS = {
     premise: "THE MOON MOVED 1 KM\nFARTHER EVERY SECOND?", label: "DISTANCE TO THE MOON", unit: "km", start: "384400", end: "554392", rate: "1",
     tag: "MAKE YOUR OWN MOON SIM", episode: "none", rule: "Rule: 1 km/s · not real orbital physics", hero: "recede", endWord: "Locked",
     curve: "0:0,0.0673:0.00047,0.1731:0.00121,0.2308:0.00272,0.2885:0.00424,0.4038:0.00804,0.4423:0.03718,0.5048:0.08757,0.5577:0.14271,0.6346:0.16583,0.7115:0.18894,0.8077:0.40153,0.8462:0.48657,0.8846:0.86312,0.9423:0.98345,1:1",
-    len: "20", tail: "2", int: "floor",
-    stages: "Whole ocean: 100\u00A0°C in ~3.5 minutes. @3.1\nEvery ocean boiled off in ~23 minutes. @7.3\nA day now lasts 26+ hours. @9.1\nA day now lasts 41+ hours. @14.6\nThe Moon stops moving. @17.5" } },
+    len: "35", tail: "2", int: "floor", // CEO #4609: full arc now; free cuts off at 20s mid-climb
+    stages: "Whole ocean: 100\u00A0°C in ~3.5 minutes. @3.1\nEvery ocean boiled off in ~23 minutes. @7.3\nA day now lasts 26+ hours. @9.1\nA day now lasts 41+ hours. @14.6\nThe Moon stops moving. @30" } },
   // SIM #022 Runner (Hype #4521, IG 10.7k): first-person "world streaming past" hero, same sim-clock/counter/caption
   // machinery as every other whatif-sim demo — just a new `hero: "firstperson"` visual, no new template.
   runner: { t: "whatif-sim", name: "You ran 1 km/h faster every second", p: {
     premise: "You ran 1 km/h\nfaster every second?", label: "YOUR SPEED", unit: "km/h", start: "0", end: "30158", rate: "1",
     tag: "RUN, FASTER EVERY SECOND", rule: "Rule: +1 km/h every second · not real physics", episode: "022", hero: "firstperson", endWord: "Orbit",
-    int: "floor", len: "20", tail: "2",
+    int: "floor", len: "35", tail: "2", // CEO #4609: full arc; free cuts off at 20s (well before orbit)
     // No literal numbers in the captions (HUD already shows the live exact figure): the default pow(2.2) curve
-    // climbs from ~0 to 30,158 over 18 s, so a caption's own number would drift wildly out of the ±25%
-    // caption-vs-HUD tolerance by the time the NEXT caption takes over (first found in Muse's review, #4539).
-    stages: "Speed climbs 1 km/h every second. @3\nAlready faster than a cheetah. @6\nFaster than the speed of sound. @9.5\nYour weight here: almost nothing. @13.5\nWeight: zero. You're in orbit. @17" } },
+    // climbs from ~0 to 30,158 over the full length, so a caption's own number would drift wildly out of the
+    // ±25% caption-vs-HUD tolerance by the time the NEXT caption takes over (first found in Muse's review, #4539).
+    stages: "Speed climbs 1 km/h every second. @3\nAlready faster than a cheetah. @6\nFaster than the speed of sound. @9.5\nYour weight here: almost nothing. @13.5\nWeight: zero. You're in orbit. @30" } },
   life: { t: "whatif-sim", name: "Your life played at 1 second per year", p: {
     premise: "Your life played at\n1 second per year?", label: "Age", unit: "years", start: "0", end: "18", rate: "0.0000000316881",
     tag: "Your life", rule: "Rule: 1 second = 1 year · US averages", episode: "005", hero: "seasons", endWord: "Paused",

@@ -5,6 +5,8 @@ import { renderBed, RATE } from "./audio.js";
 import * as Lic from "./licence.js";
 
 const $ = (id) => document.getElementById(id);
+const num = (x, d = 0) => { const n = Number(x); return Number.isFinite(n) ? n : d; };
+const fmtInt = (n) => Math.round(n).toLocaleString("en-US");
 const FREE_PER_DAY = 3, FREE_MAX_S = 20, PRO_MAX_S = 45;
 const q = new URLSearchParams(location.search);
 // The 3D template is on a preview path until Muse GOes: hidden from the picker unless the link asks for it.
@@ -203,8 +205,21 @@ function tick(now) {
   if (state.playing) state.frozen = t;
   renderFrame(ctx, state.tpl, state.params, t, { watermark: !state.pro });
   const len = $("len"), over = !state.pro && D > FREE_MAX_S + 1e-6;
-  const txt = `Length ${D.toFixed(1)} s · ${state.pro ? "Pro max " + PRO_MAX_S : "free max " + FREE_MAX_S} s` + (over ? " · too long for free" : "");
-  if (len.textContent !== txt) { len.textContent = txt; len.style.color = over ? "var(--err, #ff6b6b)" : ""; }
+  const txt = `Length ${D.toFixed(1)} s · ${state.pro ? "Pro max " + PRO_MAX_S + " s" : "free exports " + FREE_MAX_S + " s, Pro up to " + PRO_MAX_S + " s"}`;
+  if (len.textContent !== txt) len.textContent = txt;
+  // CEO #4609: the value gap, honest and visible BEFORE export — where the free clip actually cuts off.
+  const fc = $("freecap");
+  if (over) {
+    const unit = String(state.params.unit || "").trim();
+    const vEndNum = num(state.params.end, 0), vEnd = fmtInt(vEndNum);
+    const v20 = state.tpl.valueAt ? state.tpl.valueAt(state.params, D, FREE_MAX_S) : null;
+    const verb = v20 !== null && vEndNum < v20 ? "drop" : "climb"; // oxygen-style demos count DOWN, not up
+    const fcTxt = v20 !== null
+      ? `Free export ends here: T+${FREE_MAX_S} s, ${fmtInt(v20)} ${unit}. Pro: the full ${verb} to ${vEnd} ${unit}.`
+      : `Free exports stop at ${FREE_MAX_S} s (this one runs ${D.toFixed(1)} s) — Pro exports the rest, up to ${PRO_MAX_S} s.`;
+    if (fc.textContent !== fcTxt) fc.textContent = fcTxt;
+    fc.hidden = false;
+  } else fc.hidden = true;
   if (state.safe) drawSafeOverlay(ctx);
   requestAnimationFrame(tick);
 }
@@ -216,7 +231,9 @@ $("export").onclick = async () => {
   if (inAppName && !canShareFiles()) { showInAppExportBlocked(); return; }
   if (state.tpl.pro && !state.pro) { blocked("template_locked", msg, 'This template is Pro. <a data-limit="template_locked" href="../pricing.html">See pricing</a> or enter your licence key.'); return; }
   const D = state.tpl.duration(state.params);
-  if (!state.pro && D > FREE_MAX_S + 1e-6) { blocked("length_cap", msg, `Free exports are limited to ${FREE_MAX_S} s (this one is ${D.toFixed(1)} s). Remove a beat, or <a data-limit="length_cap" href="../pricing.html">go Pro</a> for up to ${PRO_MAX_S} s.`, { secs: Math.round(D) }); return; }
+  // CEO #4609: free no longer blocks a long template — it exports the first FREE_MAX_S s of the real arc
+  // (the value-gap marker above already told the visitor where it cuts off, before they clicked Export).
+  const truncated = !state.pro && D > FREE_MAX_S + 1e-6;
   if (!state.pro && left() === 0) { blocked("daily_cap", msg, `You've used today's ${FREE_PER_DAY} free exports. <a data-limit="daily_cap" href="../pricing.html">Go Pro</a> for unlimited.`); return; }
   $("export").disabled = true; prog.hidden = false; prog.value = 0; msg.textContent = "Rendering…";
   let use = state.tpl, par = state.params, fell = false;
@@ -228,20 +245,34 @@ $("export").onclick = async () => {
   };
   try {
     if (use.id === "whatif-3d") { if (!(await ensure3D()) || get3D().lost) to2D(); else set3DRes(state.pro ? 1920 : 1280); }
-    const doExport = () => exportMp4({ tpl: use, params: par, fps: state.pro ? 60 : 30, watermark: !state.pro, endCard: !state.pro, audio: sound(), onProgress: (p) => (prog.value = p) });
+    const doExport = () => exportMp4({ tpl: use, params: par, fps: state.pro ? 60 : 30, watermark: !state.pro, endCard: !state.pro, audio: sound(), maxDuration: truncated ? FREE_MAX_S : undefined, onProgress: (p) => (prog.value = p) });
     let blob = await doExport();
     if (use.id === "whatif-3d" && get3D() && get3D().lost) { to2D(); msg.textContent = "Rendering the 2D look…"; blob = await doExport(); }
     const url = URL.createObjectURL(blob);
     const wantSound = sound(), noAudio = wantSound && !blob.hasAudio;
-    const wav = noAudio ? URL.createObjectURL(bedWav(use, par, { endCard: !state.pro })) : "";
+    const wav = noAudio ? URL.createObjectURL(bedWav(use, par, { endCard: !state.pro, maxDuration: truncated ? FREE_MAX_S : undefined })) : "";
     const filename = `povmaker-${use.id}.mp4`;
     const file = new File([blob], filename, { type: blob.type || "video/mp4" });
     let canShareFile = false;
     try { canShareFile = !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch { canShareFile = false; }
-    $("out").innerHTML = `<video src="${url}" controls loop playsinline></video><p>` +
+    // CEO #4609: the upsell card sells the PAYOFF (the ending the free clip doesn't reach), and sits
+    // above Save/share — it's the first thing seen after a truncated export, not an afterthought below it.
+    let upsellHtml = "";
+    if (!state.pro) {
+      const nT = TEMPLATES.filter((t) => !t.preview).length;
+      upsellHtml = truncated
+        ? `<div class="box upsell" style="margin-bottom:12px"><b>Your clip stops at ${FREE_MAX_S} s. Want the ending?</b><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="after_export" data-variant="payoff1" data-label="Get the full video · ${(window.SITE_CONFIG || {}).priceLabel || "$9/mo"}" href="../pricing.html">Get the full video</a></p><p class="muted" style="margin:6px 0 0">Pro: up to ${PRO_MAX_S} s · no watermark · 60 fps · cancel anytime · 14-day refund</p></div>`
+        : `<div class="box upsell" style="margin-bottom:12px"><b>Want this without the watermark?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports · ${nT} templates</p><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="after_export" data-variant="watermark1" href="../pricing.html">Go Pro</a> <span class="muted">14-day refund, cancel any time</span></p></div>`;
+    }
+    $("out").innerHTML = upsellHtml + `<video src="${url}" controls loop playsinline></video><p>` +
       (canShareFile ? `<button id="sharebtn" class="btn primary" type="button">Save / share video</button>` : `<a class="btn primary" download="${filename}" href="${url}">Download MP4</a>`) +
       `</p>` +
       (noAudio ? `<p class="muted">This browser can't put sound inside the MP4. <a download="povmaker-${use.id}.wav" href="${wav}">Download the sound (WAV)</a> and add it when you post (Instagram, TikTok and CapCut all take your own audio), or export on desktop Chrome / Safari 26 for a video with sound.</p>` : "");
+    if (!state.pro) {
+      const a = $("out").querySelector(".upsell a[data-checkout]");
+      if (a) window.POVUpgrade && window.POVUpgrade.bind(a);
+      track("upsell_view", { where: "after_export", variant: truncated ? "payoff1" : "watermark1", template: state.tpl.id });
+    }
     if (canShareFile) {
       $("sharebtn").onclick = async () => {
         try { await navigator.share({ files: [file], title: "POVMaker video" }); }
@@ -258,17 +289,10 @@ $("export").onclick = async () => {
         }
       };
     }
-    if (!state.pro) {
-      bump(); setPro(false); setLimit("watermark");
-      const nT = TEMPLATES.filter((t) => !t.preview).length;
-      const n = document.createElement("div"); n.className = "box upsell"; n.style.marginTop = "12px";
-      n.innerHTML = `<b>Want this without the watermark?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports · ${nT} templates</p><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="after_export" href="../pricing.html">Go Pro</a> <span class="muted">14-day refund, cancel any time</span></p>`;
-      $("out").appendChild(n); window.POVUpgrade && window.POVUpgrade.bind(n.querySelector("a"));
-      track("upsell_view", { where: "after_export", template: state.tpl.id });
-    }
+    if (!state.pro) { bump(); setPro(false); setLimit(truncated ? "payoff" : "watermark"); }
     msg.className = "msg ok";
-    msg.textContent = "Done. Post it with the AI-generated label on." + (sound() && !blob.hasAudio ? " The video has no sound in this browser, but the sound is available below." : "") + (fell ? " 3D isn't available in this browser, so this export uses the 2D What If look." : "");
-    track("export_done", { template: state.tpl.id, rendered: use.id, pro: state.pro ? 1 : 0, secs: Math.round(D), audio: blob.hasAudio ? 1 : 0, demo: state.demo ? q.get("demo") : "" });
+    msg.textContent = "Done. Post it with the AI-generated label on." + (truncated ? ` This clip stops at ${FREE_MAX_S} s — Pro exports the full climb.` : "") + (sound() && !blob.hasAudio ? " The video has no sound in this browser, but the sound is available below." : "") + (fell ? " 3D isn't available in this browser, so this export uses the 2D What If look." : "");
+    track("export_done", { template: state.tpl.id, rendered: use.id, pro: state.pro ? 1 : 0, secs: Math.round(truncated ? FREE_MAX_S : D), truncated: truncated ? 1 : 0, audio: blob.hasAudio ? 1 : 0, demo: state.demo ? q.get("demo") : "" });
   } catch (e) {
     msg.className = "msg err"; msg.textContent = e.message || "Export failed.";
     track("export_error", { msg: String((e && e.message) || e).slice(0, 200), ua: inAppName || "browser", template: use.id });

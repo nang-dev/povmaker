@@ -21,10 +21,10 @@
     return "";
   }
   function bind(a) {
-    if (href) { a.href = href; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Upgrade to Pro · " + price; }
+    if (href) { a.href = href; a.target = "_blank"; a.rel = "noopener"; a.textContent = a.getAttribute("data-label") || ("Upgrade to Pro · " + price); }
     else a.textContent = "Pro launching this week, get notified";
     a.addEventListener("click", function () {
-      if (window.POVTrack) window.POVTrack.track("upgrade_click", { page: location.pathname.split("/").pop() || "index", checkout: href ? "live" : "waitlist", limit: a.getAttribute("data-limit") || lastLimit() || "header" });
+      if (window.POVTrack) window.POVTrack.track("upgrade_click", { page: location.pathname.split("/").pop() || "index", checkout: href ? "live" : "waitlist", limit: a.getAttribute("data-limit") || lastLimit() || "header", variant: a.getAttribute("data-variant") || "" });
     });
   }
   window.POVUpgrade = { bind: bind };

@@ -33,8 +33,10 @@ export function ascFrom(desc) {
 
 // Fallback for browsers that can't encode audio into the MP4 (iOS before 26): the same bed as a 16-bit stereo 48 kHz WAV
 // (L=R, so it measures the same -14 LUFS as the MP4) that the user can add in their editor / when posting. ~9 MB for 45 s.
-export function bedWav(tpl, params, { endCard = false } = {}) {
-  const s = renderBed(tpl, params, { endCard }).samples, n = s.length, b = new DataView(new ArrayBuffer(44 + n * 4));
+export function bedWav(tpl, params, { endCard = false, maxDuration } = {}) {
+  const full = renderBed(tpl, params, { endCard }).samples;
+  const s = maxDuration ? full.subarray(0, Math.min(full.length, Math.round((maxDuration + (endCard ? END_CARD_S : 0)) * RATE))) : full;
+  const n = s.length, b = new DataView(new ArrayBuffer(44 + n * 4));
   const w = (o, t) => [...t].forEach((c, i) => b.setUint8(o + i, c.charCodeAt(0)));
   w(0, "RIFF"); b.setUint32(4, 36 + n * 4, true); w(8, "WAVEfmt "); b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 2, true);
   b.setUint32(24, RATE, true); b.setUint32(28, RATE * 4, true); b.setUint16(32, 4, true); b.setUint16(34, 16, true); w(36, "data"); b.setUint32(40, n * 4, true);
@@ -44,7 +46,7 @@ export function bedWav(tpl, params, { endCard = false } = {}) {
 
 export const canWebCodecs = () => typeof VideoEncoder !== "undefined" && typeof VideoFrame !== "undefined";
 
-export async function exportMp4({ tpl, params, fps, watermark, endCard, audio = true, onProgress }) {
+export async function exportMp4({ tpl, params, fps, watermark, endCard, audio = true, maxDuration, onProgress }) {
   if (!canWebCodecs()) throw new Error("This browser can't export video yet. Please use Chrome, Edge or Safari 16.4+.");
   let pick = null;
   for (const [mux, codec] of CODECS) {
@@ -60,7 +62,10 @@ export async function exportMp4({ tpl, params, fps, watermark, endCard, audio = 
   let err = null;
   const enc = new VideoEncoder({ output: (c, m) => vchunks.push([c, m]), error: (e) => { err = e; } });
   enc.configure(pick.cfg);
-  const total = tpl.duration(params) + (endCard ? END_CARD_S : 0), frames = Math.round(total * fps);
+  // CEO #4609: the free tier's "clip" is a genuine PREVIEW of a longer arc, not a shorter template —
+  // maxDuration truncates the render at the free cap instead of the template's own (longer, Pro-only) duration.
+  const clipD = maxDuration ? Math.min(tpl.duration(params), maxDuration) : tpl.duration(params);
+  const total = clipD + (endCard ? END_CARD_S : 0), frames = Math.round(total * fps);
   for (let i = 0; i < frames; i++) {
     if (err) throw err;
     renderFrame(ctx, tpl, params, i / fps, { watermark, endCard });
