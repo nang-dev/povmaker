@@ -64,7 +64,11 @@ function updateBar() {
   if (!show) return;
   $("pbn").textContent = left() + "/" + FREE_PER_DAY;
   $("probarlink").href = href; $("wmlink").href = href;
+  fitBar();
 }
+// keep the last row of the page (and Export) clear of the fixed bar whatever its height (1-3 lines)
+function fitBar() { const b = $("probar"); document.body.style.paddingBottom = b.hidden ? "" : b.getBoundingClientRect().height + 12 + "px"; }
+addEventListener("resize", fitBar);
 $("probarlink").addEventListener("click", () => track("upgrade_click", { page: "make", checkout: "live", limit: "bar", exports_left: left() }));
 $("wmlink").addEventListener("click", () => track("upgrade_click", { page: "make", checkout: "live", limit: "watermark_preview" }));
 $("activate").onclick = async () => {
