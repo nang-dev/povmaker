@@ -218,6 +218,41 @@ function heroRecede(ctx, t, w, cam) { // "moonfar": Earth and a Moon that drifts
   ctx.fillStyle = m; ctx.beginPath(); ctx.arc(mx, my, 20, 0, 7); ctx.fill();
   ctx.restore();
 }
+function heroFirstPerson(ctx, t, w, cam) { // "runner": a first-person track POV that streams faster as the counter climbs (Runner #022's read, in 2D)
+  const horizon = 960, speed = 0.15 + w * w * 2.4; // quadratic so the rush is visibly faster near the payoff, not linear
+  ctx.save();
+  const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+  sky.addColorStop(0, w < 0.55 ? "#8FB6D8" : "#1C2A44"); sky.addColorStop(1, w < 0.55 ? "#D8E6EF" : "#3A4F72"); // day fades to dusk as speed climbs
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, horizon);
+  const ground = ctx.createLinearGradient(0, horizon, 0, H);
+  ground.addColorStop(0, "#7A4A38"); ground.addColorStop(1, "#4E2E22"); ctx.fillStyle = ground; ctx.fillRect(0, horizon, W, H - horizon);
+  ctx.strokeStyle = "rgba(242,244,247,.4)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, horizon); ctx.lineTo(W, horizon); ctx.stroke();
+  ctx.save(); ctx.translate(540, horizon); ctx.scale(cam, cam); ctx.translate(-540, -horizon);
+  const vx = 540, bob = Math.sin(t * 7.4) * 5; // run-cadence camera bob
+  // lane lines: radiate from the vanishing point, scroll outward (phase driven by sim progress -> faster = denser streaks)
+  const lanes = [-360, -200, -80, 80, 200, 360];
+  for (const lx of lanes) {
+    ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = Math.abs(lx) < 90 ? 6 : 4;
+    ctx.beginPath(); ctx.moveTo(vx + lx * 0.06, horizon + bob); ctx.lineTo(vx + lx * 3.4, H); ctx.stroke();
+  }
+  const phase = (t * speed * 90) % 140;
+  for (let i = -1; i < 10; i++) {
+    const d = i * 140 + phase, y = horizon + bob + d * d * 0.01;
+    if (y <= horizon || y > H) continue;
+    const k = (y - horizon) / (H - horizon), hw = 30 + k * 420;
+    ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - k * 0.4)})`;
+    ctx.fillRect(vx - hw - hw * 0.08, y, hw * 0.16, 10 + k * 26); // rung across the lanes, like a track's distance markers
+  }
+  ctx.restore();
+  // speed-streak vignette at high w: thin radiating motion lines over the whole frame, like Runner's Mach-speed beats
+  if (w > 0.5) {
+    ctx.save(); ctx.globalAlpha = (w - 0.5) * 1.6; ctx.strokeStyle = "rgba(255,255,255,.5)"; ctx.lineWidth = 2;
+    for (let i = 0; i < 18; i++) { const a = (i / 18) * Math.PI * 2, r0 = 120, r1 = 900;
+      ctx.beginPath(); ctx.moveTo(540 + Math.cos(a) * r0, horizon + Math.sin(a) * r0 * 0.4); ctx.lineTo(540 + Math.cos(a) * r1, horizon + Math.sin(a) * r1 * 0.55); ctx.stroke(); }
+    ctx.restore();
+  }
+  ctx.restore();
+}
 const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 function heroSeasons(ctx, t, age, cam) { // "life": a window onto a tree that runs a full year of seasons per counter year; the room changes with the age
   const cx = 540, cy = 960, ph = ((age % 1) + 1) % 1, A = Math.floor(age + 1e-9);
@@ -523,6 +558,7 @@ function drawWhatIfSim(ctx, t, p, D) {
   else if (hero === "ladder") heroScale(ctx, t, v, String(p.ladder || "fold"), cam);
   else if (hero === "clock") heroClock(ctx, t, v, cam);
   else if (hero === "seasons") heroSeasons(ctx, t, contact ? Math.floor(v + 1e-9) + 0.75 : v, cam);   // the pause lands on a still winter frame
+  else if (hero === "firstperson") heroFirstPerson(ctx, t, w, cam);
   else [mx, my] = simHero(ctx, Math.min(t, tEnd), w, hit, cam);
   if (contact && !calm && ct < 0.7) { // shockwave from the contact point
     ctx.save(); ctx.strokeStyle = `rgba(255,90,60,${0.7 * (1 - ct / 0.7)})`; ctx.lineWidth = 10;
@@ -1098,6 +1134,16 @@ export const DEMOS = {
     curve: "0:0,0.0673:0.00047,0.1731:0.00121,0.2308:0.00272,0.2885:0.00424,0.4038:0.00804,0.4423:0.03718,0.5048:0.08757,0.5577:0.14271,0.6346:0.16583,0.7115:0.18894,0.8077:0.40153,0.8462:0.48657,0.8846:0.86312,0.9423:0.98345,1:1",
     len: "20", tail: "2", int: "floor",
     stages: "Whole ocean: 100\u00A0°C in ~3.5 minutes. @3.1\nEvery ocean boiled off in ~23 minutes. @7.3\nA day now lasts 26+ hours. @9.1\nA day now lasts 41+ hours. @14.6\nThe Moon stops moving. @17.5" } },
+  // SIM #022 Runner (Hype #4521, IG 10.7k): first-person "world streaming past" hero, same sim-clock/counter/caption
+  // machinery as every other whatif-sim demo — just a new `hero: "firstperson"` visual, no new template.
+  runner: { t: "whatif-sim", name: "You ran 1 km/h faster every second", p: {
+    premise: "You ran 1 km/h\nfaster every second?", label: "YOUR SPEED", unit: "km/h", start: "0", end: "30158", rate: "1",
+    tag: "RUN, FASTER EVERY SECOND", rule: "Rule: +1 km/h every second · not real physics", episode: "022", hero: "firstperson", endWord: "Orbit",
+    int: "floor", len: "20", tail: "2",
+    // No literal numbers in the captions (HUD already shows the live exact figure): the default pow(2.2) curve
+    // climbs from ~0 to 30,158 over 18 s, so a caption's own number would drift wildly out of the ±25%
+    // caption-vs-HUD tolerance by the time the NEXT caption takes over (first found in Muse's review, #4539).
+    stages: "Speed climbs 1 km/h every second. @3\nAlready faster than a cheetah. @6\nFaster than the speed of sound. @9.5\nYour weight here: almost nothing. @13.5\nWeight: zero. You're in orbit. @17" } },
   life: { t: "whatif-sim", name: "Your life played at 1 second per year", p: {
     premise: "Your life played at\n1 second per year?", label: "Age", unit: "years", start: "0", end: "18", rate: "0.0000000316881",
     tag: "Your life", rule: "Rule: 1 second = 1 year · US averages", episode: "005", hero: "seasons", endWord: "Paused",
