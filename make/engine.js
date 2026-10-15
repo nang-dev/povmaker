@@ -42,7 +42,7 @@ function captionBal(ctx, text, { x = 502, y = 1262, maxW = 840, size = 62, minSi
   let sz = size, lines = [];
   for (; sz >= minSize; sz -= 2) { ctx.font = grot(sz); track(ctx, -0.005 * sz); lines = wrap(ctx, text, maxW); if (lines.length <= maxLines) break; }
   if (lines.length === 2) {
-    const w = text.split(/\s+/); let best = null, bd = 1e9;
+    const w = text.split(/ +/); let best = null, bd = 1e9;   // ASCII spaces only: a no-break space (e.g. "100\u00A0°C") never becomes a line break
     for (let i = 1; i < w.length; i++) {
       const a = w.slice(0, i).join(" "), b = w.slice(i).join(" "), wa = ctx.measureText(a).width, wb = ctx.measureText(b).width;
       if (wa <= maxW && wb <= maxW && Math.abs(wa - wb) < bd) { bd = Math.abs(wa - wb); best = [a, b]; }
@@ -202,6 +202,20 @@ function heroAtmos(ctx, t, frac, hot, cam) { // "oxygen": Earth with a halo that
   const e = ctx.createRadialGradient(cx - 40, cy - 40, 20, cx, cy, 170);
   e.addColorStop(0, f > 0.02 ? "#5FA8D8" : "#6b7683"); e.addColorStop(1, f > 0.02 ? "#14304A" : "#2a3038");
   ctx.fillStyle = e; ctx.beginPath(); ctx.arc(cx, cy, 150, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function heroRecede(ctx, t, w, cam) { // "moonfar": Earth and a Moon that drifts OUT; the dashed amber ring is where it stops (to scale: 554,392 / 384,400 = 1.44)
+  const cx = 540, cy = 960, R0 = 190, R1 = R0 * 1.442, r = R0 + (R1 - R0) * clamp(w), ang = -1.1 + t * 0.55;
+  ctx.save(); ctx.translate(cx, cy); ctx.scale(cam, cam); ctx.translate(-cx, -cy);
+  ctx.strokeStyle = "rgba(255,176,32,.45)"; ctx.lineWidth = 3; ctx.setLineDash([14, 14]);
+  ctx.beginPath(); ctx.arc(cx, cy, R1, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = "rgba(61,214,245,.35)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke();
+  const e = ctx.createRadialGradient(cx - 22, cy - 22, 8, cx, cy, 72);
+  e.addColorStop(0, "#5FA8D8"); e.addColorStop(1, "#14304A");
+  ctx.fillStyle = e; ctx.beginPath(); ctx.arc(cx, cy, 70, 0, 7); ctx.fill();
+  const mx = cx + r * Math.cos(ang), my = cy + r * Math.sin(ang), m = ctx.createRadialGradient(mx - 6, my - 6, 2, mx, my, 22);
+  m.addColorStop(0, "#F2F4F7"); m.addColorStop(1, "#9AA3AE");
+  ctx.fillStyle = m; ctx.beginPath(); ctx.arc(mx, my, 20, 0, 7); ctx.fill();
   ctx.restore();
 }
 const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -488,7 +502,7 @@ function drawWhatIfSim(ctx, t, p, D) {
   let si = -1; for (let i = 0; i < n; i++) if (t >= starts[i] - 1e-9) si = i;
   const sT = si < 0 ? 0 : t - starts[si];
   const curve = String(p.curve || "").split(",").map((x) => x.split(":").map(Number)).filter((x) => x.length === 2 && x.every(Number.isFinite));  // "u:w,u:w": piecewise-linear time map
-  const lin = String(p.ease || "") === "linear" || curve.length > 1, calm = ["seasons", "clock", "frost", "ladder"].includes(String(p.hero || ""));   // calm = a pause, not a crash
+  const lin = String(p.ease || "") === "linear" || curve.length > 1, calm = ["seasons", "clock", "frost", "ladder", "recede"].includes(String(p.hero || ""));   // calm = a pause, not a crash
   const contact = t >= tEnd, ct = t - tEnd;
   const hit = (si >= 0 && sT < 0.35) || contact;
   const u = clamp(t / tEnd);
@@ -505,6 +519,7 @@ function drawWhatIfSim(ctx, t, p, D) {
   else if (hero === "dots") heroDots(ctx, t, Math.abs(v - a), Math.abs(b - a), contact, ct, cam);
   else if (hero === "atmosphere") heroAtmos(ctx, t, 1 - w, hit, cam);
   else if (hero === "frost") heroFrost(ctx, t, w, cam);
+  else if (hero === "recede") heroRecede(ctx, t, w, cam);
   else if (hero === "ladder") heroScale(ctx, t, v, String(p.ladder || "fold"), cam);
   else if (hero === "clock") heroClock(ctx, t, v, cam);
   else if (hero === "seasons") heroSeasons(ctx, t, contact ? Math.floor(v + 1e-9) + 0.75 : v, cam);   // the pause lands on a still winter frame
@@ -521,7 +536,7 @@ function drawWhatIfSim(ctx, t, p, D) {
     RTS.drawCounter(ctx, shown(v), { y: bt + 24, size: 96, unit: unitFor(v), label: "" });
   } else {
     RTS.drawHudFrame(ctx, { scrim: true });
-    RTS.drawPovTag(ctx, `${epi(p)} · ${String(p.tag || "").trim() || "WHAT IF"}`, { right: simClock(simS, String(p.clock || "") === "years") });
+    RTS.drawPovTag(ctx, (String(p.episode) === "none" ? "" : `${epi(p)} · `) + (String(p.tag || "").trim() || "WHAT IF"), { right: simClock(simS, String(p.clock || "") === "years") });
     const full = Math.abs(b - a) / rate, per = full / Math.max(0.1, lin ? tEnd : tEnd - HOLD); // average sim seconds per real second
     ctx.save(); ctx.font = mono(24); track(ctx, 1.2); ctx.fillStyle = P.cyan; ctx.textAlign = "right"; ctx.textBaseline = "alphabetic";
     ctx.fillText(p.speedUnit ? `▶▶ 1 S ≈ ${(Math.abs(b - a) / Math.max(0.1, lin ? tEnd : tEnd - HOLD)).toFixed(1).replace(/\.0$/, "")} ${String(p.speedUnit).toUpperCase()}` : `▶▶ 1 S ≈ ${simSpan(per)}`, 940, 296); ctx.restore();
@@ -533,7 +548,7 @@ function drawWhatIfSim(ctx, t, p, D) {
     }
     const k = easeBack(sT / 0.25);
     ctx.save(); ctx.globalAlpha = clamp(sT / 0.15); ctx.translate(0, (1 - k) * 30);
-    captionBal(ctx, stages[si] || "", { y: 1262 });
+    captionBal(ctx, stages[si] || "", { y: 1262, size: String(stages[si] || "").length > 30 ? 54 : 62 });   // long (2-line) captions a size down so they clear the footer line
     ctx.restore();
     ctx.fillStyle = P.line; ctx.fillRect(TB.x0, 1240, TW, 6);
     ctx.fillStyle = contact ? P.alert : P.amber; ctx.fillRect(TB.x0, 1240, TW * u, 6);
@@ -1075,6 +1090,14 @@ export const DEMOS = {
     premise: "Earth lost 1% of its\noxygen every second?", label: "Oxygen left", unit: "%", start: "100", end: "0", rate: "1",
     tag: "Earth loses 1% O2/s", rule: "Rule: 1% per second · not real chemistry", episode: "006", hero: "atmosphere", endWord: "Gone",
     stages: "Oxygen drains every second.\nFull to zero in 100 seconds.\nDenver-thin air.\nCandles go out.\nGas flames die." } },
+  // SIM #021 Moon farther (Hype #3203, counters = shared/scripts/2026-10-15-moon-farther-021.counters.json, Atlas). HELD until Muse GO + the Short is live.
+  // curve = Moon km vs run progress from the counters (u = t/52 s); stages are the video's pinned captions (each true at its start: ocean 100 C at T+3m26s, oceans gone T+22m47s, day 26.5 h / 41.1 h, lock at 554,392 km).
+  moonfar: { hold: true, t: "whatif-sim", name: "The Moon moved 1 km farther every second", p: {
+    premise: "THE MOON MOVED 1 KM\nFARTHER EVERY SECOND?", label: "DISTANCE TO THE MOON", unit: "km", start: "384400", end: "554392", rate: "1",
+    tag: "MAKE YOUR OWN MOON SIM", episode: "none", rule: "Rule: 1 km/s · not real orbital physics", hero: "recede", endWord: "Locked",
+    curve: "0:0,0.0673:0.00047,0.1731:0.00121,0.2308:0.00272,0.2885:0.00424,0.4038:0.00804,0.4423:0.03718,0.5048:0.08757,0.5577:0.14271,0.6346:0.16583,0.7115:0.18894,0.8077:0.40153,0.8462:0.48657,0.8846:0.86312,0.9423:0.98345,1:1",
+    len: "20", tail: "2", int: "floor",
+    stages: "Whole ocean: 100\u00A0°C in ~3.5 minutes. @3.1\nEvery ocean boiled off in ~23 minutes. @7.3\nA day now lasts 26+ hours. @9.1\nA day now lasts 41+ hours. @14.6\nThe Moon stops moving. @17.5" } },
   life: { t: "whatif-sim", name: "Your life played at 1 second per year", p: {
     premise: "Your life played at\n1 second per year?", label: "Age", unit: "years", start: "0", end: "18", rate: "0.0000000316881",
     tag: "Your life", rule: "Rule: 1 second = 1 year · US averages", episode: "005", hero: "seasons", endWord: "Paused",

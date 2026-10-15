@@ -30,7 +30,7 @@ window.SITE_CONFIG = {
     { demo: "goose", title: "POV: you're the goose", thumb: "thumbs/goose.jpg", cta: "Make a simpler chat version of this one, free →" },
     { demo: "hand", title: "POV: you're his car", thumb: "thumbs/car.jpg", cta: "Make a simpler version of this one, free →" },
     { demo: "driver", title: "LOSER #1: you're the driver", thumb: "thumbs/driver.jpg", cta: "Make a simpler version of this one, free →" },
-    // { demo: "commute", title: "What if your commute went straight up?", thumb: "thumbs/commute.jpg", cta: "Make a simpler 2D version of this one, free →" }, // enable once SIM #004 is posted
+    { demo: "commute", title: "What if your commute went straight up?", thumb: "thumbs/commute.jpg", cta: "Make a simpler 2D version of this one, free →" },
   ],
   defaultBrand: "ranthesim",
   // One page, brand picked by ?brand= or utm_campaign=. Bio links: /?utm_source=instagram&utm_campaign=ranthesim
