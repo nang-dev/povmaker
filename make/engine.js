@@ -200,7 +200,7 @@ function autoStages(unit, a, b, rate, tEnd) {
   if (!(rate > 0) || a === b || !(tEnd > HOLD)) return { lines: [], curve: [] };
   const lo = Math.min(a, b), hi = Math.max(a, b), span = hi - lo, table = MILESTONES[String(unit || "").trim()] || [];
   const real = table.filter((ms) => ms.v > lo + 1e-9 && ms.v < hi - 1e-9)
-    .map((ms) => ({ v: ms.v, real: true, text: `${simSpan(Math.abs(ms.v - a) / rate)}: past ${ms.label}.` }));
+    .map((ms) => ({ v: ms.v, real: true, text: `Passed ${ms.label} at ${simSpan(Math.abs(ms.v - a) / rate)}.` }));
   const rounds = niceNumbers(lo, hi).map((v) => ({ v, real: false, text: `Past ${fmtNice(v)} ${unit}.` }));
   const wOf = (v) => (v - a) / (b - a); // chronological order: ascending w, NOT ascending value — a descending counter (b < a) needs its highest value first
   const merged = []; // sourced milestones win over a round number that lands within 2% of the same value
