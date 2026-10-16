@@ -1303,7 +1303,7 @@ export const DEMOS = {
   newmoon: { t: "whatif-sim", name: "A new moon appeared every second", p: {
     premise: "A new moon appeared\nevery second?", label: "Moons", unit: "moons", start: "1", end: "1536", rate: "1",
     tag: "New Moon #029", rule: "Rule: +1 new moon every second, same mass & distance", episode: "029", hero: "dots", endWord: "Tiled",
-    len: "35", stages: "25 moons. Tidal pull climbs to ×25. @7\n60 moons. Nearly double that pull. ×60. @14\n150 moons. Sky coverage: ~12%. @21\n800 moons. Over half the sky: ~49%. @27\n1,536 moons. The sky tiles over: ~72%. @32",
+    len: "35", stages: "25 moons. Tidal pull climbs to ×25. @7\n60 moons. More than double that pull. ×60. @14\n150 moons. Sky coverage: ~12%. @21\n800 moons. Nearly half the sky: ~49%. @27\n1,536 moons. The sky tiles over: ~72%. @32",
     curve: "0:0,0.209:0,0.2149:0.015635,0.4179:0.015635,0.4239:0.038436,0.6269:0.038436,0.6328:0.097068,0.806:0.097068,0.8119:0.520521,0.9552:0.520521,0.9612:1,1:1" } },
   // SIM #026, shared/scripts/2026-10-15-nearest-star-026.md §3.1/§6: Proxima Centauri closes in 1%/s
   // (compounding) -- an exponential decay, so (like runner/moonfar) the live HUD value races through most
