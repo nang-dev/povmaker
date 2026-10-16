@@ -141,9 +141,48 @@ function simHero(ctx, t, w, hot, cam) {
 }
 const TAIL = 1.5; // contact hold: counter red + flash before the end card
 const tailOf = (p) => clamp(num(p.tail, TAIL), 0.5, 4);   // hidden preset param: a longer hold for a caption that has to be read
+// CEO #5060/#5070: comparison-card captions for the self-serve picker, auto-placed when `stages` is left blank.
+// Each caption names a FIXED elapsed sim-time fact ("9 H: past the Eiffel Tower.") rather than quoting the live HUD
+// value at an instant, so it stays true no matter how the value curve accelerates (same rule as every hand-authored
+// whatif-sim caption — restating a live number invites the ±25% caption-vs-HUD drift problem, see MEMORY lesson).
+const MILESTONES = {
+  m: [
+    { v: 93, label: "the Statue of Liberty", source: "U.S. National Park Service: 93 m, base to torch" },
+    { v: 330, label: "the Eiffel Tower", source: "Tour Eiffel: 330 m, current height incl. antennas" },
+    { v: 8849, label: "Mount Everest", source: "Nepal/China joint survey, Dec 2020: 8,848.86 m" },
+    { v: 10700, label: "a cruising airliner's altitude", source: "FAA: typical airliner cruise altitude, ~35,000 ft / 10,700 m" },
+    { v: 100000, label: "the Karman line, the edge of space", source: "FAI: 100,000 m, internationally used edge-of-space definition" },
+  ],
+  "km/h": [
+    { v: 44.7, label: "Usain Bolt's top speed", source: "IAAF-timed peak speed, 2009 World Championships: ~44.7 km/h" },
+    { v: 120, label: "a cheetah's sprint speed", source: "widely cited peak cheetah sprint speed, ~120 km/h" },
+    { v: 1235, label: "the speed of sound", source: "speed of sound at sea level, ~340 m/s = 1,235 km/h" },
+    { v: 27500, label: "orbital velocity", source: "low Earth orbit speed, ~7.8 km/s = 27,500 km/h" },
+  ],
+  "°C": [
+    { v: 0, label: "water's freezing point", source: "0 °C at 1 atm" },
+    { v: -40, label: "the point where °C and °F match", source: "-40 °C = -40 °F, exact" },
+    { v: -89, label: "the coldest air temperature ever recorded", source: "Vostok Station, Antarctica, 1983: -89.2 °C" },
+    { v: -210, label: "nitrogen's freezing point", source: "-210 °C (-346 °F) at 1 atm" },
+  ],
+  "%": [
+    { v: 50, label: "the halfway point", source: "midpoint, by definition" },
+    { v: 20.9, label: "today's atmospheric oxygen level", source: "Earth's current atmosphere, ~20.9% O2 by volume" },
+  ],
+};
+function autoStages(unit, a, b, rate, tEnd) {
+  const table = MILESTONES[String(unit || "").trim()]; if (!table || !(rate > 0) || a === b) return [];
+  const lo = Math.min(a, b), hi = Math.max(a, b);
+  return table.filter((ms) => ms.v > lo + 1e-9 && ms.v < hi - 1e-9)
+    .map((ms) => ({ ms, u: (ms.v - a) / (b - a) })).sort((x, y) => x.u - y.u).slice(0, 6)
+    .map(({ ms, u }) => { const t = clamp(tEnd * Math.pow(u, 1 / 2.2), HOLD, tEnd);
+      return `${simSpan(Math.abs(ms.v - a) / rate)}: past ${ms.label}. @${t.toFixed(1)}`; });
+}
 // Caption plan. "text @5.5" pins a beat to 5.5 s (every line must carry it); otherwise the beats are spaced evenly after the hold.
 function stagePlan(p, D) {
-  const raw = rows(p.stages), tEnd = D - tailOf(p);
+  const tEnd = D - tailOf(p);
+  let raw = rows(p.stages);
+  if (!raw.length) raw = autoStages(p.unit, num(p.start, 0), num(p.end, 1), num(p.rate, 1), tEnd);   // blank stages = auto comparison cards
   const m = raw.map((l) => /^(.*\S)\s*@\s*(\d+(?:\.\d+)?)\s*$/.exec(l));
   const texts = raw.map((l, i) => (m[i] ? m[i][1] : l)), n = Math.max(1, texts.length);
   const starts = raw.length && m.every(Boolean) ? m.map((x) => clamp(Number(x[2]), HOLD, tEnd))
@@ -1037,13 +1076,13 @@ export const TEMPLATES = [
     fields: [
       { key: "premise", label: "The question (1-3 lines, max 9 words; WHAT IF is added for you)", type: "textarea", def: "The Moon got 1 km closer\nevery second?" },
       { key: "label", label: "Counter label", type: "text", def: "Distance to Moon" },
-      { key: "unit", label: "Counter unit", type: "text", def: "km" },
+      { key: "unit", label: "Counter unit (m, km/h, °C or % auto-generates comparison captions below)", type: "text", def: "km" },
       { key: "start", label: "Counter starts at", type: "number", def: "384400" },
       { key: "end", label: "Counter ends at", type: "number", def: "0" },
       { key: "rate", label: "Counter speed in sim time (units per second; sets the HUD clock)", type: "number", def: "1" },
       { key: "tag", label: "Short tag (shows after the question)", type: "text", def: "Moon +1 km/s" },
       { key: "rule", label: "Rule line (optional)", type: "text", def: "Rule: 1 km/s · not real orbital physics" },
-      { key: "stages", label: "Captions, one per beat (one per line)", type: "textarea", def: "Tides start to climb\nCoastlines go under at dawn\nThe sky is mostly Moon\nIt doesn't stop." },
+      { key: "stages", label: "Captions, one per beat (one per line). Leave blank for automatic comparison cards", type: "textarea", def: "Tides start to climb\nCoastlines go under at dawn\nThe sky is mostly Moon\nIt doesn't stop." },
       { key: "episode", label: "Sim number", type: "text", def: "001" },
     ],
     duration: (p) => { const L = num(p.len, 0); if (L > 0) return clamp(L, 8, 60); const n = rows(p.stages).length; return dur(HOLD + TAIL, n <= 4 ? 3.2 : Math.max(2.6, Math.min(3.2, 15.5 / n)), n, 8, 45); }, draw: drawWhatIfSim, bg: (ctx, t) => simBg(ctx, t),
@@ -1181,6 +1220,13 @@ export const DEMOS = {
     tag: "Ants x2 every second", rule: "Rule: 1 ant, doubles every second", episode: "015", hero: "ladder", ladder: "ants", endWord: "Earth's ants",
     ease: "linear", int: "floor", speedUnit: "doublings", len: "20", tail: "1.5",
     stages: "One ant. It doubles every second. @3\nPast 1,000 ants: a spoonful. @4.2\nPast 50,000: a coffee mug. @5.4\nPast a million: a small bucket. @7\nPast 30 million: a wheelie bin. @8.7\nPast a billion: a garden shed. @10.3\nPast 10 billion: a living room. @11.4\nPast 100 billion: a house. @12.6\nPast a trillion: over six storeys. @13.7\nPast 10 trillion: a 13-storey block. @15.1\nTaller than the Great Pyramid. @16.8\nAbout every ant on Earth: taller than the Empire State. @18.5" } },
+  // CEO #5060/#5070: the self-serve "+1/second" picker demo. stages left blank -> autoStages() generates the comparison
+  // captions from MILESTONES.m. Facts match the cleared houseplant script (shared/scripts/2026-10-15-plant-grows-007.md):
+  // start 0.12 m seedling, rate 0.01 m/s = 1 cm/s, Eiffel (330 m) at ~9 h, Everest (8,849 m) at ~10 d, Karman (100,000 m) at ~115 d.
+  houseplant: { t: "whatif-sim", name: "A houseplant grew 1 cm every second", p: {
+    premise: "A houseplant grew\n1 cm every second?", label: "Height", unit: "m", start: "0.12", end: "100000", rate: "0.01",
+    tag: "Houseplant +1 cm/s", rule: "Rule: 1 cm/s · no acceleration", episode: "007", endWord: "Karman line",
+    len: "35", tail: "1.5", stages: "" } },
   hand: { t: "hand", name: "Give him a big hand: you're his car", p: {} },
   // HAND #2 copy from shared/scripts/2026-10-15-b5-big-hand-2-the-bed.md. HELD until HAND #2 has posted (Muse: the demo would spoil the post).
   handbed: { hold: true, t: "hand", name: "Give him a big hand: you're the empty bed", p: { tag: "HAND #2: you're the empty bed", object: "bed", punch: "BIG HAND?\nI'M KING SIZE.", topper: "I HAVE A MINT." } },
