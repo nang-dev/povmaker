@@ -36,12 +36,17 @@
   if (C.paymentUrl) { var wl = $("waitlist"); if (wl) wl.hidden = true; } 
   cta.addEventListener("click", function () { send("/track", { event: "cta_click" }); });
 
-  if (C.videos && C.videos.length) {
+  // CEO #5274: a card with a `live` UTC timestamp (ISO string) stays hidden until that post actually goes
+  // live on IG, so the bio never shows a "make this one" link for a video nobody can see yet.
+  var liveVideos = (C.videos || []).filter(function (v) { return !v.live || Date.now() >= new Date(v.live).getTime(); });
+  if (liveVideos.length) {
     var ul = $("videos"); ul.innerHTML = "";
-    C.videos.forEach(function (v) {
-      var li = document.createElement("li"), a = document.createElement("a");
-      a.href = v.url; a.rel = "noopener"; a.target = "_blank";
-      a.addEventListener("click", function () { send("/track", { event: "video_click" }); if (window.POVTrack) window.POVTrack.track("video_click", { title: v.title }); });
+    liveVideos.forEach(function (v) {
+      var li = document.createElement("li");
+      // No IG permalink yet (CEO #5274): render the title as plain text, not a link, until v.url is filled in.
+      var a = v.url ? document.createElement("a") : document.createElement("span");
+      if (v.url) { a.href = v.url; a.rel = "noopener"; a.target = "_blank";
+        a.addEventListener("click", function () { send("/track", { event: "video_click" }); if (window.POVTrack) window.POVTrack.track("video_click", { title: v.title }); }); }
       if (v.thumb) { var im = document.createElement("img"); im.src = v.thumb; im.alt = ""; im.width = 45; im.height = 80; im.loading = "lazy"; a.appendChild(im); }
       var t = document.createElement("span"); t.className = "vt"; t.textContent = v.title; a.appendChild(t);
       if (v.tag) { var g = document.createElement("span"); g.className = "tag"; g.textContent = v.tag; a.appendChild(g); }

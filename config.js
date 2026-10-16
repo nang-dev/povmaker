@@ -44,6 +44,16 @@ window.SITE_CONFIG = {
         // { label: "TikTok", url: "https://www.tiktok.com/@ranthesim" },
       ],
       videos: [
+        // CEO #5274: ranthesim's IG restart lineup, newest post first. Each card has a hard-coded `live`
+        // UTC go-live time (ISO) so app.js hides it until that post is actually up; no IG permalink yet
+        // (`url` stays unset until poster has it — card renders with a plain-text title until then).
+        // CTA/caption/utm per CEO: "Make this one, free →", utm_source=bio&utm_campaign=ranthesim&utm_content=<preset>
+        // (app.js already appends utm_medium=latest + those params from v.make.demo).
+        { title: "What if your car accelerated 10 km/h every second?", live: "2026-10-18T01:20:00Z", thumb: "thumbs/carreentry.jpg", make: { demo: "carreentry", cta: "Make this one, free →" } },
+        { title: "What if coffee got 5°C hotter every second?", live: "2026-10-17T20:40:00Z", thumb: "thumbs/coffee.jpg", make: { demo: "coffee", cta: "Make this one, free →" } },
+        { title: "What if your heart rate rose 5 bpm every second?", live: "2026-10-17T16:10:00Z", thumb: "thumbs/heartrate.jpg", make: { demo: "heartrate", cta: "Make this one, free →" } },
+        { title: "What if the nearest star moved 1% closer every second?", live: "2026-10-16T16:10:00Z", thumb: "thumbs/neareststar.jpg", make: { demo: "neareststar", cta: "Make this one, free →" } },
+        { title: "What if a new moon appeared every second?", live: "2026-10-16T03:30:00Z", thumb: "thumbs/newmoon.jpg", make: { demo: "newmoon", cta: "Make this one, free →" } },
         // { title, url, thumb (frame 0, thumbs/*.jpg) }. Order = Muse's top 3 by views (#2828).
         { title: "What if the Moon got 1 km closer every second?", url: "https://www.instagram.com/reel/Ded_OL-lPc-/", thumb: "thumbs/moon.jpg", make: { demo: "moon3d", cta: "Make a simpler 3D version of this one, free →" } },
         { title: "What if oxygen dropped 1% every second?", url: "https://www.instagram.com/ranthesim/reel/DefWy1EiZi9/", thumb: "thumbs/oxygen.jpg", make: { demo: "oxygen", cta: "Make a simpler 2D version of this one, free →" } },

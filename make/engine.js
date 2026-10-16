@@ -1288,6 +1288,43 @@ export const DEMOS = {
     premise: "Your pulse rose\n5 bpm every second?", label: "Heart rate", unit: "bpm", start: "70", end: "300", rate: "5",
     tag: "Heart Rate #038", rule: "Rule: +5 bpm every second", episode: "038", endWord: "No pulse",
     len: "35", tail: "1.5", stages: "" } },
+  // CEO #5274 ranthesim relaunch presets: hand-authored stages (not autoStages) so QA can diff each number
+  // directly against the posted script/counters.json. Checkpoint values/sources below are copied from each
+  // script's own event table; times/curve are MY OWN compressed-to-35s pacing (the posted video runs far
+  // longer), not the posted video's literal timing — same convention as moonfar/cools/runner.
+  // SIM #029, shared/scripts/2026-10-15-new-moon-every-second-029.md §3.1: N moons (start 1, payoff 1,536),
+  // tidal pull = N exactly, sky coverage from the script's own derive.py table.
+  newmoon: { t: "whatif-sim", name: "A new moon appeared every second", p: {
+    premise: "A new moon appeared\nevery second?", label: "Moons", unit: "moons", start: "1", end: "1536", rate: "1",
+    tag: "New Moon #029", rule: "Rule: +1 new moon every second, same mass & distance", episode: "029", hero: "dots", endWord: "Tiled",
+    len: "35", stages: "25 moons. Tidal pull climbs to ×25. @7\n60 moons. Nearly double that pull. ×60. @14\n150 moons. Sky coverage: ~12%. @21\n800 moons. Over half the sky: ~49%. @27\n1,536 moons. The sky tiles over: ~72%. @32",
+    curve: "0:0,0.209:0.01564,0.4179:0.03844,0.6269:0.09707,0.806:0.52052,0.9552:1" } },
+  // SIM #026, shared/scripts/2026-10-15-nearest-star-026.md §3.1/§6: Proxima Centauri closes in 1%/s
+  // (compounding) -- an exponential decay, so (like runner/moonfar) the live HUD value races through most
+  // of the real AU range almost immediately in linear display terms. No literal numbers in the captions
+  // (HUD already shows the live exact figure) -- same rule as every other wide/compounding-range demo
+  // (see MEMORY lesson). Checkpoints are the script's own sourced landmarks: real planetary orbital
+  // distances (NASA Fact Sheet) + the star's own photosphere (star-facts.com, Gaia DR2 distance).
+  neareststar: { t: "whatif-sim", name: "The nearest star moved 1% closer every second", p: {
+    premise: "The nearest star moved\n1% closer every second?", label: "Distance to nearest star", unit: "AU", start: "268400", end: "0", rate: "1",
+    tag: "Nearest Star #026", rule: "Rule: 1% closer every second, compounding", episode: "026", hero: "sun", endWord: "Swallowed",
+    len: "35", stages: "Passed Neptune's orbit, the edge of the Kuiper Belt. @7\nPassed Saturn's orbit. @13\nAs close as Earth's own orbit around the Sun. @19\nInside Mercury's orbit. @25\nCrossed into the star's own photosphere. @30" } },
+  // SIM #034, shared/scripts/2026-10-15-coffee-every-second-034.md §3.1: coffee heats 5°C/s, no ceiling.
+  // Checkpoints are real material/physics figures (boiling point, Draper point, Al/steel melting points,
+  // lava temp, Sun photosphere temp) copied from the script's own sourced event table.
+  coffee: { t: "whatif-sim", name: "Coffee got 5°C hotter every second", p: {
+    premise: "Coffee got 5°C\nhotter every second?", label: "Coffee temperature", unit: "°C", start: "70", end: "5800", rate: "5",
+    tag: "Coffee +5°C/s", rule: "Rule: +5°C every second, no ceiling", episode: "034", endWord: "Sunlike",
+    len: "35", stages: "100°C. It's boiling. @4.5\n~233°C. The napkin would catch fire. @8.4\n525°C. Steel starts to glow — the Draper point. @12\n660°C. The aluminum melts. @14.5\n~700°C. Glass sags under its own weight. @16.5\n~1,450°C. Steel fully melts — already hotter than lava. @20.1\n5,500°C. Hotter than the Sun's visible surface. @25.1",
+    curve: "0:0,0.1343:0.00524,0.2507:0.02845,0.3582:0.0794,0.4328:0.10297,0.4925:0.10995,0.6:0.2408,0.7493:0.94764,1:1" } },
+  // SIM #032, shared/scripts/2026-10-15-car-reentry-032.md §3.1/§6: car accelerates 10 km/h/s, no ceiling.
+  // Checkpoints are the script's own sourced landmarks (highway limit, Bugatti Chiron Super Sport's own top
+  // speed, ThrustSSC's 1997 land-speed record, Mach 5, the popularly-cited Shuttle reentry speed).
+  carreentry: { t: "whatif-sim", name: "Your car accelerated 10 km/h every second", p: {
+    premise: "Your car accelerated\n10 km/h every second?", label: "Speed", unit: "km/h", start: "0", end: "28000", rate: "10",
+    tag: "Car Reentry #032", rule: "Rule: +10 km/h every second, no ceiling", episode: "032", hero: "firstperson", endWord: "Reentry",
+    len: "35", stages: "120 km/h. The highway limit. @4\n490 km/h. The Chiron's own top speed. @7\n1,228 km/h. The sound barrier breaks — ThrustSSC, 1997. @10\nMach 5: 6,174 km/h. The hood starts to glow. @14\n28,000 km/h. ~Mach 25 — Space Shuttle reentry speed. @26",
+    curve: "0:0,0.1194:0.004286,0.209:0.0175,0.2985:0.04386,0.4179:0.2205,0.7761:0.98,1:1" } },
   hand: { t: "hand", name: "Give him a big hand: you're his car", p: {} },
   // HAND #2 copy from shared/scripts/2026-10-15-b5-big-hand-2-the-bed.md. HELD until HAND #2 has posted (Muse: the demo would spoil the post).
   handbed: { hold: true, t: "hand", name: "Give him a big hand: you're the empty bed", p: { tag: "HAND #2: you're the empty bed", object: "bed", punch: "BIG HAND?\nI'M KING SIZE.", topper: "I HAVE A MINT." } },
