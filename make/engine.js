@@ -149,6 +149,9 @@ const MILESTONES = {
   m: [
     { v: 93, label: "the Statue of Liberty", source: "U.S. National Park Service: 93 m, base to torch" },
     { v: 330, label: "the Eiffel Tower", source: "Tour Eiffel: 330 m, current height incl. antennas" },
+    { v: 828, label: "the Burj Khalifa", source: "Emaar Properties / CTBUH official figure: 828 m" },
+    { v: 3776, label: "Mount Fuji", source: "Japan Meteorological Agency: 3,776 m" },
+    { v: 5895, label: "Mount Kilimanjaro", source: "Tanzania National Parks, Uhuru Peak: 5,895 m" },
     { v: 8849, label: "Mount Everest", source: "Nepal/China joint survey, Dec 2020: 8,848.86 m" },
     { v: 10700, label: "a cruising airliner's altitude", source: "FAA: typical airliner cruise altitude, ~35,000 ft / 10,700 m" },
     { v: 100000, label: "the Karman line, the edge of space", source: "FAI: 100,000 m, internationally used edge-of-space definition" },
@@ -156,38 +159,83 @@ const MILESTONES = {
   "km/h": [
     { v: 44.7, label: "Usain Bolt's top speed", source: "IAAF-timed peak speed, 2009 World Championships: ~44.7 km/h" },
     { v: 120, label: "a cheetah's sprint speed", source: "widely cited peak cheetah sprint speed, ~120 km/h" },
+    { v: 300, label: "a high-speed train's top speed", source: "typical TGV/Shinkansen operating top speed, ~300 km/h" },
+    { v: 900, label: "a cruising airliner's speed", source: "typical commercial jet cruise speed, ~900 km/h" },
     { v: 1235, label: "the speed of sound", source: "speed of sound at sea level, ~340 m/s = 1,235 km/h" },
     { v: 27500, label: "orbital velocity", source: "low Earth orbit speed, ~7.8 km/s = 27,500 km/h" },
   ],
   "°C": [
+    { v: -18, label: "a home freezer's temperature", source: "FDA recommended home freezer setting: -18 °C (0 °F)" },
     { v: 0, label: "water's freezing point", source: "0 °C at 1 atm" },
     { v: -40, label: "the point where °C and °F match", source: "-40 °C = -40 °F, exact" },
     { v: -89, label: "the coldest air temperature ever recorded", source: "Vostok Station, Antarctica, 1983: -89.2 °C" },
     { v: -210, label: "nitrogen's freezing point", source: "-210 °C (-346 °F) at 1 atm" },
   ],
   "%": [
-    { v: 50, label: "the halfway point", source: "midpoint, by definition" },
     { v: 20.9, label: "today's atmospheric oxygen level", source: "Earth's current atmosphere, ~20.9% O2 by volume" },
+    { v: 50, label: "the halfway point", source: "midpoint, by definition" },
+    { v: 78, label: "today's atmospheric nitrogen level", source: "Earth's current atmosphere, ~78.1% N2 by volume" },
   ],
 };
+const fmtNice = (v) => { const a = Math.abs(v), s = v < 0 ? "-" : "";
+  return s + (a >= 100 ? Math.round(a).toLocaleString("en-US") : a >= 10 ? a.toFixed(0) : a >= 1 ? a.toFixed(1).replace(/\.0$/, "") : a.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")); };
+// "Nice" 1-2-5 round numbers spanning (lo,hi), used to fill a caption gap when no sourced milestone falls inside it —
+// CEO #5070 round 2: a caption must change at least every ~6 s of screen time (a fresh beat every few seconds is the
+// format's whole engine), so a gap is never left holding a stale caption under a HUD value it no longer describes.
+function niceNumbers(lo, hi) {
+  if (!(hi > lo)) return [];
+  const out = [], top = Math.ceil(Math.log10(Math.max(Math.abs(hi), Math.abs(lo), 1))) + 1, bot = top - 8;
+  for (let e = bot; e <= top; e++) for (const k of [1, 2, 5]) { const v = k * Math.pow(10, e); if (v > lo + 1e-9 && v < hi - 1e-9) out.push(v); }
+  return out;
+}
+const parseCurve = (s) => String(s || "").split(",").map((x) => x.split(":").map(Number)).filter((x) => x.length === 2 && x.every(Number.isFinite));
+// CEO #5070 round 2: a wide value range (e.g. 0.12 m to 100,000 m) under the default pow(2.2) curve blows past every
+// small/medium milestone within the first couple of seconds — real crossing times would all cluster near t=HOLD, so
+// spacing captions "whenever the counter happens to cross them" doesn't work for a wide range, the SAME reason every
+// hand-authored wide-range demo (moonfar, cools, sleepless, fold, ants) ships its own explicit `curve` override. So
+// autoStages builds its OWN curve: pick ~1 waypoint (sourced milestone, else a "nice" round number) per ~5.5 s of
+// screen time, evenly spaced in TIME, and define the value curve to pass through each at its assigned time — this
+// makes "caption appears exactly when the counter crosses it" true by construction, not by inverting a fixed curve.
 function autoStages(unit, a, b, rate, tEnd) {
-  const table = MILESTONES[String(unit || "").trim()]; if (!table || !(rate > 0) || a === b) return [];
-  const lo = Math.min(a, b), hi = Math.max(a, b);
-  return table.filter((ms) => ms.v > lo + 1e-9 && ms.v < hi - 1e-9)
-    .map((ms) => ({ ms, u: (ms.v - a) / (b - a) })).sort((x, y) => x.u - y.u).slice(0, 6)
-    .map(({ ms, u }) => { const t = clamp(tEnd * Math.pow(u, 1 / 2.2), HOLD, tEnd);
-      return `${simSpan(Math.abs(ms.v - a) / rate)}: past ${ms.label}. @${t.toFixed(1)}`; });
+  if (!(rate > 0) || a === b || !(tEnd > HOLD)) return { lines: [], curve: [] };
+  const lo = Math.min(a, b), hi = Math.max(a, b), span = hi - lo, table = MILESTONES[String(unit || "").trim()] || [];
+  const real = table.filter((ms) => ms.v > lo + 1e-9 && ms.v < hi - 1e-9)
+    .map((ms) => ({ v: ms.v, real: true, text: `${simSpan(Math.abs(ms.v - a) / rate)}: past ${ms.label}.` }));
+  const rounds = niceNumbers(lo, hi).map((v) => ({ v, real: false, text: `Past ${fmtNice(v)} ${unit}.` }));
+  const wOf = (v) => (v - a) / (b - a); // chronological order: ascending w, NOT ascending value — a descending counter (b < a) needs its highest value first
+  const merged = []; // sourced milestones win over a round number that lands within 2% of the same value
+  for (const c of [...real, ...rounds].sort((x, y) => wOf(x.v) - wOf(y.v))) {
+    const dupe = merged.find((m) => Math.abs(m.v - c.v) < 0.02 * (span || 1));
+    if (dupe) { if (c.real && !dupe.real) Object.assign(dupe, c); continue; }
+    merged.push(c);
+  }
+  const count = clamp(Math.round((tEnd - HOLD) / 5.5), 3, 9);
+  let chosen = merged;
+  if (merged.length > count) { const idx = new Set();
+    for (let i = 0; i < count; i++) idx.add(Math.round((i * (merged.length - 1)) / Math.max(1, count - 1)));
+    chosen = merged.filter((_, i) => idx.has(i)); }
+  const n = chosen.length; if (!n) return { lines: [], curve: [] };
+  const lines = [], curve = [[0, 0]];
+  chosen.forEach((c, i) => {
+    const t = HOLD + ((i + 1) * (tEnd - HOLD)) / (n + 1), u = clamp(t / tEnd), w = clamp((c.v - a) / (b - a));
+    lines.push(`${c.text} @${t.toFixed(1)}`); curve.push([u, w]);
+  });
+  curve.push([1, 1]);
+  return { lines, curve };
 }
 // Caption plan. "text @5.5" pins a beat to 5.5 s (every line must carry it); otherwise the beats are spaced evenly after the hold.
 function stagePlan(p, D) {
   const tEnd = D - tailOf(p);
-  let raw = rows(p.stages);
-  if (!raw.length) raw = autoStages(p.unit, num(p.start, 0), num(p.end, 1), num(p.rate, 1), tEnd);   // blank stages = auto comparison cards
+  let raw = rows(p.stages), curve = parseCurve(p.curve);
+  if (!raw.length) { // blank stages = auto comparison cards (+ the curve they need to land on-time, see autoStages)
+    const auto = autoStages(p.unit, num(p.start, 0), num(p.end, 1), num(p.rate, 1), tEnd);
+    raw = auto.lines; if (!curve.length) curve = auto.curve;
+  }
   const m = raw.map((l) => /^(.*\S)\s*@\s*(\d+(?:\.\d+)?)\s*$/.exec(l));
   const texts = raw.map((l, i) => (m[i] ? m[i][1] : l)), n = Math.max(1, texts.length);
   const starts = raw.length && m.every(Boolean) ? m.map((x) => clamp(Number(x[2]), HOLD, tEnd))
     : Array.from({ length: n }, (_, i) => HOLD + (i * (tEnd - HOLD)) / n);
-  return { texts, starts, n, tEnd };
+  return { texts, starts, n, tEnd, curve };
 }
 // ---- per-preset heroes for the 2D sim (Muse presets review): `hero` = sun | dots | atmosphere (default = the orbit-into-Earth) ----
 // All are pure functions of the counter, drawn in the 650-1250 hero band under the same camera push (cam).
@@ -574,18 +622,16 @@ function c3(ctx, x, y, s, d, t) { // the ant cube: a dark brown block with a spe
 // Shared with the free-cap preview marker (make.js) so the HUD number it quotes at t=20s is never out of
 // sync with what the counter itself actually shows at that instant.
 function simValueAt(p, D, t) {
-  const { tEnd } = stagePlan(p, D);
-  const curve = String(p.curve || "").split(",").map((x) => x.split(":").map(Number)).filter((x) => x.length === 2 && x.every(Number.isFinite));
+  const { tEnd, curve } = stagePlan(p, D);
   const lin = String(p.ease || "") === "linear" || curve.length > 1;
   const u = clamp(t / tEnd);
   const a = num(p.start, 0), b = num(p.end, 1e6);
   return a + (b - a) * (curve.length > 1 ? curveAt(curve, u) : lin ? u : Math.pow(u, 2.2));
 }
 function drawWhatIfSim(ctx, t, p, D) {
-  const { texts: stages, starts, n, tEnd } = stagePlan(p, D);
+  const { texts: stages, starts, n, tEnd, curve } = stagePlan(p, D);
   let si = -1; for (let i = 0; i < n; i++) if (t >= starts[i] - 1e-9) si = i;
   const sT = si < 0 ? 0 : t - starts[si];
-  const curve = String(p.curve || "").split(",").map((x) => x.split(":").map(Number)).filter((x) => x.length === 2 && x.every(Number.isFinite));  // "u:w,u:w": piecewise-linear time map
   const lin = String(p.ease || "") === "linear" || curve.length > 1, calm = ["seasons", "clock", "frost", "ladder", "recede"].includes(String(p.hero || ""));   // calm = a pause, not a crash
   const contact = t >= tEnd, ct = t - tEnd;
   const hit = (si >= 0 && sT < 0.35) || contact;
@@ -1085,7 +1131,9 @@ export const TEMPLATES = [
       { key: "stages", label: "Captions, one per beat (one per line). Leave blank for automatic comparison cards", type: "textarea", def: "Tides start to climb\nCoastlines go under at dawn\nThe sky is mostly Moon\nIt doesn't stop." },
       { key: "episode", label: "Sim number", type: "text", def: "001" },
     ],
-    duration: (p) => { const L = num(p.len, 0); if (L > 0) return clamp(L, 8, 60); const n = rows(p.stages).length; return dur(HOLD + TAIL, n <= 4 ? 3.2 : Math.max(2.6, Math.min(3.2, 15.5 / n)), n, 8, 45); }, draw: drawWhatIfSim, bg: (ctx, t) => simBg(ctx, t),
+    duration: (p) => { const L = num(p.len, 0); if (L > 0) return clamp(L, 8, 60); const n = rows(p.stages).length;
+      if (!n) return 35; // blank stages = auto comparison captions (CEO #5070 r2): needs real screen time for several beats, not the stage-count fallback's 8s floor
+      return dur(HOLD + TAIL, n <= 4 ? 3.2 : Math.max(2.6, Math.min(3.2, 15.5 / n)), n, 8, 45); }, draw: drawWhatIfSim, bg: (ctx, t) => simBg(ctx, t),
     valueAt: simValueAt,
     cues: (p, D) => { const sp = stagePlan(p, D);
       return [{ t: HOLD, k: "exit" }, ...sp.starts.map((t, i) => ({ t, k: "stage", i })), { t: sp.tEnd, k: "hit" }]; } },
