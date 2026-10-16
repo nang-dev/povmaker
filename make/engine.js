@@ -161,8 +161,8 @@ const MILESTONES = {
     { v: 120, label: "a cheetah's sprint speed", source: "widely cited peak cheetah sprint speed, ~120 km/h" },
     { v: 300, label: "a high-speed train's top speed", source: "typical TGV/Shinkansen operating top speed, ~300 km/h" },
     { v: 900, label: "a cruising airliner's speed", source: "typical commercial jet cruise speed, ~900 km/h" },
-    { v: 1235, label: "the speed of sound", source: "speed of sound at sea level, ~340 m/s = 1,235 km/h" },
-    { v: 27500, label: "orbital velocity", source: "low Earth orbit speed, ~7.8 km/s = 27,500 km/h" },
+    { v: 1235, label: "the speed of sound", source: "speed of sound at sea level, ~343 m/s = 1,235 km/h" },
+    { v: 27500, label: "orbital velocity", source: "low Earth orbit speed (ISS), ~7.64 km/s = 27,500 km/h" },
   ],
   "°C": [
     { v: -18, label: "a home freezer's temperature", source: "FDA recommended home freezer setting: -18 °C (0 °F)" },
