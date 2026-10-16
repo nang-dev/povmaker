@@ -1331,6 +1331,26 @@ export const DEMOS = {
     tag: "Car Reentry #032", rule: "Rule: +10 km/h every second, no ceiling", episode: "032", hero: "firstperson", endWord: "Reentry",
     len: "35", stages: "120 km/h. The highway limit. @4\n490 km/h. The Chiron's own top speed. @7\n1,228 km/h. The sound barrier breaks — ThrustSSC, 1997. @10\nMach 5: 6,174 km/h. The hood starts to glow. @14\n28,000 km/h. ~Mach 25 — Space Shuttle reentry speed. @26",
     curve: "0:0,0.1194:0,0.1254:0.004286,0.209:0.004286,0.2149:0.0175,0.2985:0.0175,0.3045:0.043857,0.4179:0.043857,0.4239:0.2205,0.7761:0.2205,0.7821:1,1:1" } },
+  // CEO #5587 (SideChar x Every Second presets, match SideChar YT's best-performing format). Config only,
+  // reusing the firstperson hero (Runner #022). Numbers/checkpoints copied straight from the posted script's
+  // own event table (shared/scripts/2026-10-16-sec-1-sneakers.md §2/§3): shoe lifespan 805 km (300-500 mi,
+  // American Academy of Podiatric Sports Medicine / ACE), reached at s=2,407 km/h, t=2,407 s. Staircase curve
+  // (same convention as newmoon/coffee/carreentry) so the HUD lands on each caption's own stated number.
+  sneakers: { t: "whatif-sim", name: "His running shoes got 1 km/h faster every second", p: {
+    premise: "He got 1 km/h\nfaster every second?", label: "His speed", unit: "km/h", start: "0", end: "2407", rate: "1",
+    tag: "POV: you're his sneakers", episode: "none", rule: "Rule: +1 km/h every second, no ceiling", hero: "firstperson", endWord: "New Shoes",
+    len: "27.5", tail: "2", stages: "He's 1 km/h faster every second. @3.2\nUsain Bolt's top speed. Passed. @7\nA cheetah's sprint. Passed. @11.5\nA marathon done in 9 minutes. @16.5\nThe sound barrier. On foot. @21\n805 km. Shoes done in 40 minutes. @25.5",
+    curve: "0:0,0.262745:0,0.27451:0.01857,0.439216:0.01857,0.45098:0.041554,0.635294:0.041554,0.647059:0.228925,0.811765:0.228925,0.823529:0.513087,0.988235:0.513087,1:1" } },
+  // CEO #5587, 2nd of 2: goose-sign script (shared/scripts/2026-10-16-sec-4-goose-sign.md) is a pure height
+  // comparison -- MILESTONES.m already has the Statue of Liberty/Eiffel/Burj (same sourced figures the script
+  // uses) plus Fuji/Kilimanjaro, so blank stages -> autoStages() gives sourced, correctly-paced captions for
+  // free (same recipe as houseplant). Payoff left qualitative (endWord) rather than restating the script's
+  // own 7,290 m goose-flight record, since that figure isn't in MILESTONES and autoStages only captions
+  // waypoints BETWEEN start/end, not the end value itself.
+  goosesign: { t: "whatif-sim", name: "A sign grew 1 m taller every second", p: {
+    premise: "A sign grew\n1 m every second?", label: "Sign height", unit: "m", start: "1", end: "7290", rate: "1",
+    tag: "POV: you're the goose", episode: "none", rule: "Rule: +1 m every second, no ceiling", endWord: "Goose Record",
+    len: "32", tail: "1.5", stages: "" } },
   hand: { t: "hand", name: "Give him a big hand: you're his car", p: {} },
   // HAND #2 copy from shared/scripts/2026-10-15-b5-big-hand-2-the-bed.md. HELD until HAND #2 has posted (Muse: the demo would spoil the post).
   handbed: { hold: true, t: "hand", name: "Give him a big hand: you're the empty bed", p: { tag: "HAND #2: you're the empty bed", object: "bed", punch: "BIG HAND?\nI'M KING SIZE.", topper: "I HAVE A MINT." } },
