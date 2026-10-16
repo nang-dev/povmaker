@@ -176,6 +176,12 @@ const MILESTONES = {
     { v: 50, label: "the halfway point", source: "midpoint, by definition" },
     { v: 78, label: "today's atmospheric nitrogen level", source: "Earth's current atmosphere, ~78.1% N2 by volume" },
   ],
+  bpm: [ // sourced for SIM #038, shared/scripts/2026-10-15-heart-rate-038.md
+    { v: 100, label: "tachycardia", source: "American Heart Association: resting heart rate above 100 bpm" },
+    { v: 150, label: "the start of a typical SVT attack", source: "Cleveland Clinic / AHA: SVT episodes typically ~150-220 bpm" },
+    { v: 190, label: "a 30-year-old's estimated max heart rate", source: "AHA formula, 220 minus age: 220-30 = 190" },
+    { v: 250, label: "ventricular flutter", source: "LITFL / ECG references: ventricular flutter range ~250-350 bpm" },
+  ],
 };
 const fmtNice = (v) => { const a = Math.abs(v), s = v < 0 ? "-" : "";
   return s + (a >= 100 ? Math.round(a).toLocaleString("en-US") : a >= 10 ? a.toFixed(0) : a >= 1 ? a.toFixed(1).replace(/\.0$/, "") : a.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")); };
@@ -1274,6 +1280,13 @@ export const DEMOS = {
   houseplant: { t: "whatif-sim", name: "A houseplant grew 1 cm every second", p: {
     premise: "A houseplant grew\n1 cm every second?", label: "Height", unit: "m", start: "0.12", end: "100000", rate: "0.01",
     tag: "Houseplant +1 cm/s", rule: "Rule: 1 cm/s · no acceleration", episode: "007", endWord: "Karman line",
+    len: "35", tail: "1.5", stages: "" } },
+  // "Make this one" deep link for Heart Rate #038's YT description (CEO #5184): stages blank -> autoStages() on
+  // MILESTONES.bpm. Facts match the cleared script (shared/scripts/2026-10-15-heart-rate-038.md): resting 70 bpm,
+  // +5 bpm/s, 300 bpm = 0.20 s/beat, too short to refill -> fibrillation/no pulse.
+  heartrate: { t: "whatif-sim", name: "Your pulse rose 5 bpm every second", p: {
+    premise: "Your pulse rose\n5 bpm every second?", label: "Heart rate", unit: "bpm", start: "70", end: "300", rate: "5",
+    tag: "Heart Rate #038", rule: "Rule: +5 bpm every second", episode: "038", endWord: "No pulse",
     len: "35", tail: "1.5", stages: "" } },
   hand: { t: "hand", name: "Give him a big hand: you're his car", p: {} },
   // HAND #2 copy from shared/scripts/2026-10-15-b5-big-hand-2-the-bed.md. HELD until HAND #2 has posted (Muse: the demo would spoil the post).
