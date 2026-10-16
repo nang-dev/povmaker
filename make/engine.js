@@ -1292,13 +1292,19 @@ export const DEMOS = {
   // directly against the posted script/counters.json. Checkpoint values/sources below are copied from each
   // script's own event table; times/curve are MY OWN compressed-to-35s pacing (the posted video runs far
   // longer), not the posted video's literal timing — same convention as moonfar/cools/runner.
+  // CEO #5295 fix: every curve below is a STAIRCASE (ramp lands on the exact pin value within <1s of each
+  // caption's start, then holds dead flat until the next pin) so the HUD never drifts off the number a
+  // caption names for the rest of its display window — a plain ramp-the-whole-window curve (the original
+  // version here) let the live value climb past the stated number well before the next caption appeared
+  // (root cause of the "26 MOONS" vs "25 moons" mismatch CEO caught on newmoon). neareststar is unaffected
+  // (its captions are qualitative, no literal number claimed).
   // SIM #029, shared/scripts/2026-10-15-new-moon-every-second-029.md §3.1: N moons (start 1, payoff 1,536),
   // tidal pull = N exactly, sky coverage from the script's own derive.py table.
   newmoon: { t: "whatif-sim", name: "A new moon appeared every second", p: {
     premise: "A new moon appeared\nevery second?", label: "Moons", unit: "moons", start: "1", end: "1536", rate: "1",
     tag: "New Moon #029", rule: "Rule: +1 new moon every second, same mass & distance", episode: "029", hero: "dots", endWord: "Tiled",
     len: "35", stages: "25 moons. Tidal pull climbs to ×25. @7\n60 moons. Nearly double that pull. ×60. @14\n150 moons. Sky coverage: ~12%. @21\n800 moons. Over half the sky: ~49%. @27\n1,536 moons. The sky tiles over: ~72%. @32",
-    curve: "0:0,0.209:0.01564,0.4179:0.03844,0.6269:0.09707,0.806:0.52052,0.9552:1" } },
+    curve: "0:0,0.209:0,0.2149:0.015635,0.4179:0.015635,0.4239:0.038436,0.6269:0.038436,0.6328:0.097068,0.806:0.097068,0.8119:0.520521,0.9552:0.520521,0.9612:1,1:1" } },
   // SIM #026, shared/scripts/2026-10-15-nearest-star-026.md §3.1/§6: Proxima Centauri closes in 1%/s
   // (compounding) -- an exponential decay, so (like runner/moonfar) the live HUD value races through most
   // of the real AU range almost immediately in linear display terms. No literal numbers in the captions
@@ -1316,7 +1322,7 @@ export const DEMOS = {
     premise: "Coffee got 5°C\nhotter every second?", label: "Coffee temperature", unit: "°C", start: "70", end: "5800", rate: "5",
     tag: "Coffee +5°C/s", rule: "Rule: +5°C every second, no ceiling", episode: "034", endWord: "Sunlike",
     len: "35", stages: "100°C. It's boiling. @4.5\n~233°C. The napkin would catch fire. @8.4\n525°C. Steel starts to glow — the Draper point. @12\n660°C. The aluminum melts. @14.5\n~700°C. Glass sags under its own weight. @16.5\n~1,450°C. Steel fully melts — already hotter than lava. @20.1\n5,500°C. Hotter than the Sun's visible surface. @25.1",
-    curve: "0:0,0.1343:0.00524,0.2507:0.02845,0.3582:0.0794,0.4328:0.10297,0.4925:0.10995,0.6:0.2408,0.7493:0.94764,1:1" } },
+    curve: "0:0,0.1343:0,0.1403:0.005236,0.2507:0.005236,0.2567:0.028447,0.3582:0.028447,0.3642:0.079407,0.4328:0.079407,0.4388:0.102967,0.4925:0.102967,0.4985:0.109948,0.6:0.109948,0.606:0.240838,0.7493:0.240838,0.7552:0.947644,1:0.947644" } },
   // SIM #032, shared/scripts/2026-10-15-car-reentry-032.md §3.1/§6: car accelerates 10 km/h/s, no ceiling.
   // Checkpoints are the script's own sourced landmarks (highway limit, Bugatti Chiron Super Sport's own top
   // speed, ThrustSSC's 1997 land-speed record, Mach 5, the popularly-cited Shuttle reentry speed).
@@ -1324,7 +1330,7 @@ export const DEMOS = {
     premise: "Your car accelerated\n10 km/h every second?", label: "Speed", unit: "km/h", start: "0", end: "28000", rate: "10",
     tag: "Car Reentry #032", rule: "Rule: +10 km/h every second, no ceiling", episode: "032", hero: "firstperson", endWord: "Reentry",
     len: "35", stages: "120 km/h. The highway limit. @4\n490 km/h. The Chiron's own top speed. @7\n1,228 km/h. The sound barrier breaks — ThrustSSC, 1997. @10\nMach 5: 6,174 km/h. The hood starts to glow. @14\n28,000 km/h. ~Mach 25 — Space Shuttle reentry speed. @26",
-    curve: "0:0,0.1194:0.004286,0.209:0.0175,0.2985:0.04386,0.4179:0.2205,0.7761:0.98,1:1" } },
+    curve: "0:0,0.1194:0,0.1254:0.004286,0.209:0.004286,0.2149:0.0175,0.2985:0.0175,0.3045:0.043857,0.4179:0.043857,0.4239:0.2205,0.7761:0.2205,0.7821:1,1:1" } },
   hand: { t: "hand", name: "Give him a big hand: you're his car", p: {} },
   // HAND #2 copy from shared/scripts/2026-10-15-b5-big-hand-2-the-bed.md. HELD until HAND #2 has posted (Muse: the demo would spoil the post).
   handbed: { hold: true, t: "hand", name: "Give him a big hand: you're the empty bed", p: { tag: "HAND #2: you're the empty bed", object: "bed", punch: "BIG HAND?\nI'M KING SIZE.", topper: "I HAVE A MINT." } },
