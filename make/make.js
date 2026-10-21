@@ -59,9 +59,15 @@ function showInAppExportBlocked() {
   if (btn) { btn.style.display = "none"; btn.disabled = true; }
   $("prog").hidden = true;
   msg.className = "msg err";
+  const href = checkoutHref();
+  // CEO #7083: this is a dead end otherwise (22 in-app visits/week saw no path forward) — give the
+  // one working action (copy link, open in Safari) AND the same Pro pitch shown after a free export.
+  const proCard = href
+    ? `<div class="box upsell" style="margin:10px 0"><b>Want this without the watermark later?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports</p><p style="margin:0"><a class="btn sec inline" data-checkout data-limit="inapp" data-variant="inapp1" href="../pricing.html">Go Pro</a></p></div>`
+    : "";
   msg.innerHTML = `<b>This app's browser can't save videos. Open in Safari to export →</b><br>` +
     `<button id="copylinkbtn" class="btn primary" type="button" style="margin-top:8px">Copy link</button><br>` +
-    `<span class="muted">Tap ••• (or the menu icon) → Open in browser</span>`;
+    `<span class="muted">Tap ••• (or the menu icon) → Open in browser</span>` + proCard;
   const linkBtn = $("copylinkbtn");
   // projectUrl() is read at click time, not here: this banner renders once on load, well before
   // the visitor has edited any field, so the URL has to be built fresh with whatever they've typed so far.
@@ -70,6 +76,11 @@ function showInAppExportBlocked() {
     catch { linkBtn.textContent = "Couldn't copy — select the address bar instead"; }
   };
   track("export_blocked_inapp", { ua_app: inAppName });
+  if (href) {
+    const a = msg.querySelector(".upsell a[data-checkout]");
+    if (a) window.POVUpgrade && window.POVUpgrade.bind(a);
+    track("upsell_view", { where: "inapp", variant: "inapp1" });
+  }
 }
 // Which free limit the visitor just hit; upgrade.js reads it so upgrade_click carries `limit` (also on pricing.html).
 const setLimit = (l) => { try { sessionStorage.setItem("povmaker.limit", JSON.stringify({ l, t: Date.now() })); } catch {} };
@@ -104,7 +115,11 @@ function setPro(on, msg) {
   $("keymsg").className = "msg" + (msg ? " err" : "");
   buildTemplates();
   updateBar();
+  // Header "Go Pro" link is always visible on this page (CEO #7083): count the impression once
+  // licence status has settled, so Pro visitors (who shouldn't see it as a pitch) aren't counted.
+  if (!on && !headerViewSeen && checkoutHref()) { headerViewSeen = true; track("upsell_view", { where: "header", page: "make" }); }
 }
+let headerViewSeen = false;
 // Always-visible Pro bar + the preview watermark note (CEO #2941 A). Counts and caps come from the same constants/state the export uses.
 const checkoutHref = () => (window.SITE_CONFIG || {}).paymentUrl || "";
 function updateBar() {
@@ -261,8 +276,8 @@ $("export").onclick = async () => {
     if (!state.pro) {
       const nT = TEMPLATES.filter((t) => !t.preview).length;
       upsellHtml = truncated
-        ? `<div class="box upsell" style="margin-bottom:12px"><b>Your clip stops at ${FREE_MAX_S} s. Want the ending?</b><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="after_export" data-variant="payoff1" data-label="Get the full video · ${(window.SITE_CONFIG || {}).priceLabel || "$9/mo"}" href="../pricing.html">Get the full video</a></p><p class="muted" style="margin:6px 0 0">Pro: up to ${PRO_MAX_S} s · no watermark · 60 fps · cancel anytime · 14-day refund</p></div>`
-        : `<div class="box upsell" style="margin-bottom:12px"><b>Want this without the watermark?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports · ${nT} templates</p><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="after_export" data-variant="watermark1" href="../pricing.html">Go Pro</a> <span class="muted">14-day refund, cancel any time</span></p></div>`;
+        ? `<div class="box upsell" style="margin-bottom:12px"><b>Your clip stops at ${FREE_MAX_S} s. Want the ending?</b><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="post_export" data-variant="payoff1" data-label="Get the full video · ${(window.SITE_CONFIG || {}).priceLabel || "$9/mo"}" href="../pricing.html">Get the full video</a></p><p class="muted" style="margin:6px 0 0">Pro: up to ${PRO_MAX_S} s · no watermark · 60 fps · cancel anytime · 14-day refund</p></div>`
+        : `<div class="box upsell" style="margin-bottom:12px"><b>Want this without the watermark?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports · ${nT} templates</p><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="post_export" data-variant="watermark1" href="../pricing.html">Go Pro</a> <span class="muted">14-day refund, cancel any time</span></p></div>`;
     }
     $("out").innerHTML = upsellHtml + `<video src="${url}" controls loop playsinline></video><p>` +
       (canShareFile ? `<button id="sharebtn" class="btn primary" type="button">Save / share video</button>` : `<a class="btn primary" download="${filename}" href="${url}">Download MP4</a>`) +
@@ -271,7 +286,7 @@ $("export").onclick = async () => {
     if (!state.pro) {
       const a = $("out").querySelector(".upsell a[data-checkout]");
       if (a) window.POVUpgrade && window.POVUpgrade.bind(a);
-      track("upsell_view", { where: "after_export", variant: truncated ? "payoff1" : "watermark1", template: state.tpl.id });
+      track("upsell_view", { where: "post_export", variant: truncated ? "payoff1" : "watermark1", template: state.tpl.id });
     }
     if (canShareFile) {
       $("sharebtn").onclick = async () => {
