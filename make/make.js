@@ -308,6 +308,7 @@ $("export").onclick = async () => {
     msg.className = "msg ok";
     msg.textContent = "Done. Post it with the AI-generated label on." + (truncated ? ` This clip stops at ${FREE_MAX_S} s — Pro exports the full climb.` : "") + (sound() && !blob.hasAudio ? " The video has no sound in this browser, but the sound is available below." : "") + (fell ? " 3D isn't available in this browser, so this export uses the 2D What If look." : "");
     track("export_done", { template: state.tpl.id, rendered: use.id, pro: state.pro ? 1 : 0, secs: Math.round(truncated ? FREE_MAX_S : D), truncated: truncated ? 1 : 0, audio: blob.hasAudio ? 1 : 0, demo: state.demo ? q.get("demo") : "" });
+    if (q.get("rts") === "1") track("template_export", { where: "rts_landing", template: state.tpl.id });
   } catch (e) {
     msg.className = "msg err"; msg.textContent = e.message || "Export failed.";
     track("export_error", { msg: String((e && e.message) || e).slice(0, 200), ua: inAppName || "browser", template: use.id });

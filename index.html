@@ -23,7 +23,10 @@
 <link rel="stylesheet" href="style.css">
 <script>
 (function(){var q=new URLSearchParams(location.search),b=(q.get("brand")||q.get("utm_campaign")||"").toLowerCase();
-document.documentElement.dataset.brand=/sidechar/.test(b)?"sidecharpov":"ranthesim";})();
+document.documentElement.dataset.brand=/sidechar/.test(b)?"sidecharpov":"ranthesim";
+// CEO #7107: RTS YouTube viewers land straight on the speed-sim template, not the generic bio page.
+if (q.get("utm_source")==="youtube" && q.get("utm_campaign")==="ranthesim") location.replace("sim/"+location.search);
+})();
 </script>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-32.png" type="image/png" sizes="32x32">
