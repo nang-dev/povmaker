@@ -63,7 +63,7 @@ function showInAppExportBlocked() {
   // CEO #7083: this is a dead end otherwise (22 in-app visits/week saw no path forward) — give the
   // one working action (copy link, open in Safari) AND the same Pro pitch shown after a free export.
   const proCard = href
-    ? `<div class="box upsell" style="margin:10px 0"><b>Want this without the watermark later?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports</p><p style="margin:0"><a class="btn sec inline" data-checkout data-limit="inapp" data-variant="inapp1" href="../pricing.html">Go Pro</a></p></div>`
+    ? `<div class="box upsell" style="margin:10px 0"><b>Want this without the watermark later?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports</p><p style="margin:0"><a class="btn sec inline" data-checkout data-limit="inapp" data-variant="inapp1" href="../pricing.html">Go Pro</a></p><p style="margin:4px 0 0"><a class="btn sec inline" data-checkout-pass data-limit="inapp" data-variant="inapp1" href="../pricing.html" style="font-size:12px;padding:6px 10px" hidden>or $9 once — 30 days, no subscription</a></p></div>`
     : "";
   msg.innerHTML = `<b>This app's browser can't save videos. Open in Safari to export →</b><br>` +
     `<button id="copylinkbtn" class="btn primary" type="button" style="margin-top:8px">Copy link</button><br>` +
@@ -79,6 +79,8 @@ function showInAppExportBlocked() {
   if (href) {
     const a = msg.querySelector(".upsell a[data-checkout]");
     if (a) window.POVUpgrade && window.POVUpgrade.bind(a);
+    const b = msg.querySelector(".upsell a[data-checkout-pass]");
+    if (b) window.POVUpgrade && window.POVUpgrade.bindPass(b);
     track("upsell_view", { where: "inapp", variant: "inapp1" });
   }
 }
@@ -97,22 +99,33 @@ document.addEventListener("click", (e) => { // in-message links to /pricing (no 
 async function checkLicence() {
   const l = Lic.stored();
   if (!l) return setPro(false);
+  if (l.plan === "pass" && l.expires && Date.now() > l.expires) return showPassExpired();
   const fresh = Date.now() - l.checked < 24 * 3600e3;
   if (fresh) return setPro(true);
   try {
     const r = await Lic.check({ key: l.key, instance_id: l.instance_id });
-    if (r.valid) { Lic.store({ ...l, checked: Date.now() }); setPro(true); }
-    else { Lic.clear(); setPro(false, "Your Pro licence is no longer active."); }
+    if (r.valid) {
+      if (r.plan === "pass" && r.expires && Date.now() > r.expires) { Lic.store({ ...l, checked: Date.now(), plan: r.plan, expires: r.expires }); return showPassExpired(); }
+      Lic.store({ ...l, checked: Date.now(), plan: r.plan, expires: r.expires }); track("licence_ok", { plan: r.plan || "monthly" }); setPro(true);
+    } else { Lic.clear(); setPro(false, "Your Pro licence is no longer active."); }
   } catch { setPro(Date.now() - l.checked < 7 * 24 * 3600e3); } // offline grace: 7 days
 }
-function setPro(on, msg) {
+// Pass expired (CEO #7117): same dead-end-avoidance as the in-app/post-export cards — show both
+// upgrade paths (membership + a fresh pass) instead of a plain error with no next step.
+function showPassExpired() {
+  setPro(false, null, `Your 30-day pass ended. <a class="btn primary inline" data-checkout data-limit="pass_expired" data-variant="pass_expired" href="../pricing.html" style="margin:4px 4px 0 0">Go Pro · $9/mo</a> <a class="btn sec inline" data-checkout-pass data-limit="pass_expired" data-variant="pass_expired" href="../pricing.html" style="font-size:12px;padding:6px 10px" hidden>or $9 once — 30 days, no subscription</a>`);
+  const km = $("keymsg");
+  const a1 = km.querySelector("a[data-checkout]"); if (a1) window.POVUpgrade && window.POVUpgrade.bind(a1);
+  const a2 = km.querySelector("a[data-checkout-pass]"); if (a2) window.POVUpgrade && window.POVUpgrade.bindPass(a2);
+}
+function setPro(on, msg, html) {
   state.pro = on;
   $("plan").innerHTML = on ? "<b>Pro</b> · no watermark, unlimited exports, 60 fps" : `<b>Free</b> · watermark + end card · ${left()} of ${FREE_PER_DAY} exports left today`;
   $("cmp").innerHTML = [["", "Free", "Pro"], ["Watermark + end card", "yes", "no"], ["Frame rate", "30 fps", "60 fps"],
     ["Exports", FREE_PER_DAY + "/day", "unlimited"], ["Length", "up to " + FREE_MAX_S + " s", "up to " + PRO_MAX_S + " s"], ["Templates", String(TEMPLATES.filter((t) => !t.preview && !t.pro).length), "all " + TEMPLATES.filter((t) => !t.preview).length]]
     .map((r, i) => "<tr>" + r.map((c, j) => (i === 0 ? "<th>" : "<td" + (j === (on ? 2 : 1) ? ' class="on"' : "") + ">") + c + (i === 0 ? "</th>" : "</td>")).join("") + "</tr>").join("");
-  $("keymsg").textContent = msg || "";
-  $("keymsg").className = "msg" + (msg ? " err" : "");
+  if (html) { $("keymsg").innerHTML = html; $("keymsg").className = "msg err"; }
+  else { $("keymsg").textContent = msg || ""; $("keymsg").className = "msg" + (msg ? " err" : ""); }
   buildTemplates();
   updateBar();
   // Header "Go Pro" link is always visible on this page (CEO #7083): count the impression once
@@ -140,7 +153,8 @@ $("activate").onclick = async () => {
   const key = $("key").value.trim(); if (!key) return;
   $("keymsg").className = "msg"; $("keymsg").textContent = "Checking…";
   const r = await Lic.activate(key);
-  if (r.ok) { setPro(true); $("keymsg").className = "msg ok"; $("keymsg").textContent = "Pro activated. Thank you!"; $("key").value = ""; }
+  if (r.ok) { track("licence_ok", { plan: r.plan || "monthly" }); setPro(true); $("keymsg").className = "msg ok"; $("keymsg").textContent = "Pro activated. Thank you!"; $("key").value = ""; }
+  else if (r.expired) { showPassExpired(); }
   else { $("keymsg").className = "msg err"; $("keymsg").textContent = r.error; }
 };
 
@@ -275,9 +289,10 @@ $("export").onclick = async () => {
     let upsellHtml = "";
     if (!state.pro) {
       const nT = TEMPLATES.filter((t) => !t.preview).length;
+      const passLink = (variant) => `<p style="margin:4px 0 0"><a class="btn sec inline" data-checkout-pass data-limit="post_export" data-variant="${variant}" href="../pricing.html" style="font-size:12px;padding:6px 10px" hidden>or $9 once — 30 days, no subscription</a></p>`;
       upsellHtml = truncated
-        ? `<div class="box upsell" style="margin-bottom:12px"><b>Your clip stops at ${FREE_MAX_S} s. Want the ending?</b><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="post_export" data-variant="payoff1" data-label="Get the full video · ${(window.SITE_CONFIG || {}).priceLabel || "$9/mo"}" href="../pricing.html">Get the full video</a></p><p class="muted" style="margin:6px 0 0">Pro: up to ${PRO_MAX_S} s · no watermark · 60 fps · cancel anytime · 14-day refund</p></div>`
-        : `<div class="box upsell" style="margin-bottom:12px"><b>Want this without the watermark?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports · ${nT} templates</p><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="post_export" data-variant="watermark1" href="../pricing.html">Go Pro</a> <span class="muted">14-day refund, cancel any time</span></p></div>`;
+        ? `<div class="box upsell" style="margin-bottom:12px"><b>Your clip stops at ${FREE_MAX_S} s. Want the ending?</b><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="post_export" data-variant="payoff1" data-label="Get the full video · ${(window.SITE_CONFIG || {}).priceLabel || "$9/mo"}" href="../pricing.html">Get the full video</a></p>${passLink("payoff1")}<p class="muted" style="margin:6px 0 0">Pro: up to ${PRO_MAX_S} s · no watermark · 60 fps · cancel anytime · 14-day refund</p></div>`
+        : `<div class="box upsell" style="margin-bottom:12px"><b>Want this without the watermark?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports · ${nT} templates</p><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="post_export" data-variant="watermark1" href="../pricing.html">Go Pro</a> <span class="muted">14-day refund, cancel any time</span></p>${passLink("watermark1")}</div>`;
     }
     $("out").innerHTML = upsellHtml + `<video src="${url}" controls loop playsinline></video><p>` +
       (canShareFile ? `<button id="sharebtn" class="btn primary" type="button">Save / share video</button>` : `<a class="btn primary" download="${filename}" href="${url}">Download MP4</a>`) +
@@ -286,6 +301,8 @@ $("export").onclick = async () => {
     if (!state.pro) {
       const a = $("out").querySelector(".upsell a[data-checkout]");
       if (a) window.POVUpgrade && window.POVUpgrade.bind(a);
+      const b = $("out").querySelector(".upsell a[data-checkout-pass]");
+      if (b) window.POVUpgrade && window.POVUpgrade.bindPass(b);
       track("upsell_view", { where: "post_export", variant: truncated ? "payoff1" : "watermark1", template: state.tpl.id });
     }
     if (canShareFile) {

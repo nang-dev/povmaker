@@ -10,7 +10,9 @@ const PRODUCT_ID = String(C.lsProductId || "");
 const LIVE = C.mode === "live";
 const GUMROAD = C.provider === "gumroad";
 const GR_API = "https://api.gumroad.com/v2/licenses/verify";
-const GR_PRODUCT = String(C.gumroadProductId || "");
+const GR_PRODUCT = String(C.gumroadProductId || ""); // membership ($9/mo)
+const GR_PASS_PRODUCT = String(C.gumroadPassProductId || ""); // one-time 30-Day Pass (CEO #7117)
+const PASS_MS = 30 * 24 * 3600e3;
 
 export const stored = () => { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch { return null; } };
 export const store = (o) => localStorage.setItem(KEY, JSON.stringify(o));
@@ -33,11 +35,24 @@ export function grActive(j) { // Gumroad verify response -> is this subscription
   const lostDispute = (p.disputed && !p.dispute_won) || p.chargebacked;
   return !!(j && j.success) && !p.refunded && !lostDispute && !p.subscription_ended_at && !p.subscription_failed_at;
 }
-async function checkGumroad(key) {
+async function verifyAgainst(productId, key) {
   const r = await fetch(GR_API, { method: "POST", headers: { accept: "application/json", "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ product_id: GR_PRODUCT, license_key: key, increment_uses_count: "false" }) });
-  const j = await r.json().catch(() => ({}));
-  if (grActive(j)) return { valid: true, instance_id: "gumroad" };
+    body: new URLSearchParams({ product_id: productId, license_key: key, increment_uses_count: "false" }) });
+  return r.json().catch(() => ({}));
+}
+// Try the membership product first, then the one-time pass (two separate Gumroad products share no key
+// space, so a key only verifies against the one it was bought for). plan/expires let callers tell a live
+// pass from an expired one without a second request.
+async function checkGumroad(key) {
+  const j = await verifyAgainst(GR_PRODUCT, key);
+  if (grActive(j)) return { valid: true, instance_id: "gumroad", plan: "monthly" };
+  if (GR_PASS_PRODUCT) {
+    const jp = await verifyAgainst(GR_PASS_PRODUCT, key);
+    if (grActive(jp)) {
+      const ts = jp.purchase && jp.purchase.sale_timestamp ? Date.parse(jp.purchase.sale_timestamp) : Date.now();
+      return { valid: true, instance_id: "gumroad", plan: "pass", expires: ts + PASS_MS };
+    }
+  }
   return { valid: false, error: (j && j.message) || "That key isn't valid for POVMaker." };
 }
 // -> {valid, instance_id?, error?}. Throws on network/CORS failure (callers decide offline grace).
@@ -60,7 +75,8 @@ export async function activate(key) {
   try {
     const r = await check({ key: key.trim() });
     if (!r.valid) return { ok: false, error: r.error || "That key isn't valid." };
-    store({ key: key.trim(), instance_id: r.instance_id, checked: Date.now() });
-    return { ok: true };
+    if (r.plan === "pass" && r.expires && Date.now() > r.expires) return { ok: false, expired: true, error: "Your 30-day pass ended." };
+    store({ key: key.trim(), instance_id: r.instance_id, checked: Date.now(), plan: r.plan, expires: r.expires });
+    return { ok: true, plan: r.plan };
   } catch { return { ok: false, error: "Couldn't reach the licence server. Check your connection and try again." }; }
 }

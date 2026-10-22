@@ -8,7 +8,9 @@ window.SITE_CONFIG = {
   // Gumroad has no test mode: switch = provider "gumroad" + mode "live" + checkoutUrls.live (product page) + gumroadProductId,
   // then `node build.mjs` (legal pages pick the provider up from this file) and ./publish.sh.
   provider: "gumroad",
-  checkoutUrls: { test: "", live: "https://northline61.gumroad.com/l/yhuccq" },
+  // pass = one-time $9 "30-Day Pass" Gumroad product (CEO #7117/trial #32), no subscription. Empty = the second
+  // "or $9 once" button stays hidden everywhere. Fill both this and gumroadPassProductId below once Keys sends them.
+  checkoutUrls: { test: "", live: "https://northline61.gumroad.com/l/yhuccq", pass: "" },
   paymentUrl: "", // derived from mode+checkoutUrls by upgrade.js; leave empty
   ctaLabel: "Get early access",
   priceLabel: "$9/mo", // shown on the Upgrade button and in the plan box (keep in sync with the LS product + terms)
@@ -23,6 +25,7 @@ window.SITE_CONFIG = {
   lsStoreId: "", // Lemon Squeezy store id (Settings > Stores); licence keys from other stores are rejected
   lsProductId: "", // optional: POVMaker Pro product id (strict licence check)
   gumroadProductId: "hFwO80Xuaa5EjkGxut-OmQ==", // Gumroad product id (needed by the licence verify API; only used when provider = "gumroad")
+  gumroadPassProductId: "", // Gumroad product id for the one-time 30-Day Pass (separate product from the membership above)
   // Gallery tiles (gallery.js): our real posted Shorts -> the matching /make/ ?demo= preset. Order = tile order.
   gallery: [
     { demo: "moon3d", title: "What if the Moon got 1 km closer every second?", thumb: "thumbs/moon.jpg", cta: "Make a simpler 3D version of this one, free →" },
