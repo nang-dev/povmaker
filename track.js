@@ -3,7 +3,6 @@
 // (localStorage "povmaker.events") is kept for debugging: JSON.parse(localStorage["povmaker.events"]).
 (function () {
   var C = (window.SITE_CONFIG || {}).analytics || {};
-  var queue = [], ready = false;
   function local(name, data) {
     try {
       var a = JSON.parse(localStorage.getItem("povmaker.events") || "[]");
@@ -50,17 +49,23 @@
       } catch (e) {}
     });
   });
+  // CEO #7549: custom events fired right after export/upgrade taps were going missing (post_export
+  // upsell_view ~1 of 6 export_done) — the most likely moment to lose them is exactly when the page
+  // backgrounds (share sheet opens, tab switches) a beat later, and window.umami.track()'s own fetch
+  // has no keepalive guarantee against that. Send events ourselves via sendBeacon (survives unload)
+  // with a fetch keepalive fallback, straight to Umami's collect endpoint — no "ready"/queue race either.
+  var endpoint = (C.src || "").replace(/\/[^/]*$/, "/api/send");
   function send(name, data) {
+    if (!C.websiteId) return;
     try {
-      if (window.umami && window.umami.track) window.umami.track(name, data || {});
-      else if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: name, title: name, event: true });
+      var body = JSON.stringify({ payload: { website: C.websiteId, hostname: location.hostname, screen: screen.width + "x" + screen.height, language: navigator.language, title: document.title, url: location.pathname + location.search, referrer: document.referrer, name: name, data: data || {} }, type: "event" });
+      if (navigator.sendBeacon && navigator.sendBeacon(endpoint, new Blob([body], { type: "application/json" }))) return;
+      fetch(endpoint, { method: "POST", body: body, headers: { "Content-Type": "application/json" }, keepalive: true }).catch(function () {});
     } catch (e) {}
   }
-  function flush() { ready = true; queue.splice(0).forEach(function (q) { send(q[0], q[1]); }); }
   if (C.websiteId) {
-    var s = document.createElement("script");
+    var s = document.createElement("script"); // kept only for Umami's automatic pageview tracking
     s.defer = true; s.src = C.src; s.setAttribute("data-website-id", C.websiteId);
-    s.onload = flush; s.onerror = function () { queue.length = 0; };
     document.head.appendChild(s);
   }
   window.POVTrack = {
@@ -68,8 +73,7 @@
     track: function (name, data) {
       data = stamp(data);
       local(name, data);
-      if (!C.websiteId) return;
-      if (ready) send(name, data); else queue.push([name, data]);
+      send(name, data);
     },
   };
 })();
