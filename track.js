@@ -59,8 +59,11 @@
     if (!C.websiteId) return;
     try {
       var body = JSON.stringify({ payload: { website: C.websiteId, hostname: location.hostname, screen: screen.width + "x" + screen.height, language: navigator.language, title: document.title, url: location.pathname + location.search, referrer: document.referrer, name: name, data: data || {} }, type: "event" });
-      if (navigator.sendBeacon && navigator.sendBeacon(endpoint, new Blob([body], { type: "application/json" }))) return;
-      fetch(endpoint, { method: "POST", body: body, headers: { "Content-Type": "application/json" }, keepalive: true }).catch(function () {});
+      // text/plain is CORS-safelisted (no preflight, no credentialed request against Umami's wildcard ACAO);
+      // application/json is not, and a cross-origin sendBeacon with it is silently dropped by the browser
+      // while sendBeacon() itself still returns true (#7621).
+      if (navigator.sendBeacon && navigator.sendBeacon(endpoint, new Blob([body], { type: "text/plain" }))) return;
+      fetch(endpoint, { method: "POST", body: body, headers: { "Content-Type": "text/plain" }, keepalive: true, credentials: "omit" }).catch(function () {});
     } catch (e) {}
   }
   if (C.websiteId) {
