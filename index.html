@@ -40,7 +40,8 @@ if (q.get("utm_source")==="youtube" && q.get("utm_campaign")==="ranthesim") loca
     <p id="tagline" class="tagline">Make videos like these.</p>
     <p id="sub" class="sub">Type a "what if" or a meme POV. Get a vertical video in seconds.</p>
     <a id="cta" class="btn primary" href="make/" data-track="cta_click">Make a video free</a>
-    <a class="btn sec" data-checkout data-limit="home_hero" href="pricing.html" id="pro-cta">Get Pro · $9/mo</a>
+    <a class="btn sec" data-checkout-pass data-limit="home_hero" data-label="Get Pro: $9 once · 30 days" href="pricing.html" id="pro-cta-pass" hidden>Get Pro: $9 once · 30 days</a>
+    <a class="muted" data-checkout data-limit="home_hero" data-label="or $9/month membership" href="pricing.html" id="pro-cta" style="font-size:13px">or $9/month membership</a>
   </header>
 
   <section aria-labelledby="latest-h">
@@ -51,7 +52,8 @@ if (q.get("utm_source")==="youtube" && q.get("utm_campaign")==="ranthesim") loca
   <section id="pro" aria-labelledby="pro-h">
     <h2 id="pro-h">Pro is live, $9/mo</h2>
     <p class="muted">No watermark or end card · up to 45 s · 60 fps · unlimited exports · all 7 templates. 14-day refund.</p>
-    <p><a class="btn primary" data-checkout data-limit="home_pro" href="pricing.html">Get Pro · $9/mo</a></p>
+    <p><a class="btn primary" data-checkout-pass data-limit="home_pro" data-label="Get Pro: $9 once · 30 days" href="pricing.html" hidden>Get Pro: $9 once · 30 days</a></p>
+    <p style="margin:4px 0 0"><a class="muted" data-checkout data-limit="home_pro" data-label="or $9/month membership" href="pricing.html" style="font-size:13px">or $9/month membership</a></p>
   </section>
 
   <nav id="socials" class="socials" aria-label="Follow us"></nav>

@@ -101,6 +101,11 @@
 
   send("/track", { event: "visit" });
   if (window.POVTrack) window.POVTrack.track("visit_bio", { brand: brandKey, source: utm.utm_source, campaign: utm.utm_campaign });
-  // Header Pro CTA is always visible on this page (CEO #7083): count it as an upsell impression.
-  if (window.POVTrack && (C.checkoutUrls || {})[C.mode === "live" ? "live" : "test"]) window.POVTrack.track("upsell_view", { where: "header", page: "index" });
+  // Header Pro CTA is always visible on this page (CEO #7083): count it as an upsell impression, once per session (trial #39: was 92 of 99 views).
+  try {
+    if (window.POVTrack && (C.checkoutUrls || {})[C.mode === "live" ? "live" : "test"] && !sessionStorage.getItem("povmaker.hdrview")) {
+      sessionStorage.setItem("povmaker.hdrview", "1");
+      window.POVTrack.track("upsell_view", { where: "header", page: "index" });
+    }
+  } catch (e) {}
 })();

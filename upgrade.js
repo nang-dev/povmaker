@@ -17,7 +17,15 @@
     var u = new URL(raw);
     // Lemon Squeezy keeps checkout[custom][*] on the order; Gumroad drops unknown params, so do not send them there (attribution = Umami).
     if (C.provider !== "gumroad") ["utm_source", "utm_campaign", "utm_medium"].forEach(function (k) { if (utm[k] && utm[k] !== "none") u.searchParams.set("checkout[custom][" + k + "]", utm[k]); });
+    // CEO trial #39: skip Gumroad's product page, land straight on checkout (7 Gumroad views -> 0 sales).
+    else u.searchParams.set("wanted", "true");
     return u.toString();
+  }
+  // Collapse the many data-limit values into the 6 buckets the mission cares about, for upgrade_click's `where`.
+  function whereOf(v) {
+    if (v === "header" || v === "post_export" || v === "inapp" || v === "pricing") return v;
+    if (v === "daily_cap" || v === "template_locked" || v === "pass_expired") return "limit";
+    return "bar"; // home_hero, home_pro, make_plan, etc.
   }
   var href = buildHref(url);
   var hrefPass = buildHref(passUrl);
@@ -30,7 +38,7 @@
     if (href) { a.href = href; a.target = "_blank"; a.rel = "noopener"; a.textContent = a.getAttribute("data-label") || ("Upgrade to Pro · " + price); }
     else a.textContent = "Pro launching this week, get notified";
     a.addEventListener("click", function () {
-      if (window.POVTrack) window.POVTrack.track("upgrade_click", { page: location.pathname.split("/").pop() || "index", checkout: href ? "live" : "waitlist", limit: a.getAttribute("data-limit") || lastLimit() || "header", variant: a.getAttribute("data-variant") || "", plan: "monthly" });
+      if (window.POVTrack) window.POVTrack.track("upgrade_click", { page: location.pathname.split("/").pop() || "index", checkout: href ? "live" : "waitlist", where: whereOf(a.getAttribute("data-limit") || lastLimit() || "header"), variant: a.getAttribute("data-variant") || "", plan: "monthly" });
     });
   }
   function bindPass(a) {
@@ -39,7 +47,7 @@
     a.href = hrefPass; a.target = "_blank"; a.rel = "noopener";
     a.textContent = a.getAttribute("data-label") || "or $9 once — 30 days, no subscription";
     a.addEventListener("click", function () {
-      if (window.POVTrack) window.POVTrack.track("upgrade_click", { page: location.pathname.split("/").pop() || "index", checkout: "live", limit: a.getAttribute("data-limit") || lastLimit() || "header", variant: a.getAttribute("data-variant") || "", plan: "pass" });
+      if (window.POVTrack) window.POVTrack.track("upgrade_click", { page: location.pathname.split("/").pop() || "index", checkout: "live", where: whereOf(a.getAttribute("data-limit") || lastLimit() || "header"), variant: a.getAttribute("data-variant") || "", plan: "pass" });
     });
   }
   window.POVUpgrade = { bind: bind, bindPass: bindPass };

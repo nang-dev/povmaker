@@ -63,7 +63,7 @@ function showInAppExportBlocked() {
   // CEO #7083: this is a dead end otherwise (22 in-app visits/week saw no path forward) — give the
   // one working action (copy link, open in Safari) AND the same Pro pitch shown after a free export.
   const proCard = href
-    ? `<div class="box upsell" style="margin:10px 0"><b>Want this without the watermark later?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports</p><p style="margin:0"><a class="btn sec inline" data-checkout data-limit="inapp" data-variant="inapp1" href="../pricing.html">Go Pro</a></p><p style="margin:4px 0 0"><a class="btn sec inline" data-checkout-pass data-limit="inapp" data-variant="inapp1" href="../pricing.html" style="font-size:12px;padding:6px 10px" hidden>or $9 once — 30 days, no subscription</a></p></div>`
+    ? `<div class="box upsell" style="margin:10px 0"><b>Want this without the watermark later?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports</p><p style="margin:0"><a class="btn sec inline" data-checkout-pass data-limit="inapp" data-variant="inapp1" href="../pricing.html" hidden>Get Pro: $9 once · 30 days</a></p><p style="margin:4px 0 0"><a class="btn sec inline" data-checkout data-limit="inapp" data-variant="inapp1" data-label="or $9/month membership" href="../pricing.html" style="font-size:12px;padding:6px 10px">or $9/month membership</a></p></div>`
     : "";
   msg.innerHTML = `<b>This app's browser can't save videos. Open in Safari to export →</b><br>` +
     `<button id="copylinkbtn" class="btn primary" type="button" style="margin-top:8px">Copy link</button><br>` +
@@ -89,6 +89,8 @@ const setLimit = (l) => { try { sessionStorage.setItem("povmaker.limit", JSON.st
 const blocked = (limit, msg, html, extra = {}) => {
   setLimit(limit); msg.className = "msg err"; msg.innerHTML = html;
   track("export_blocked", { limit, template: state.tpl.id, ...extra });
+  const p = msg.querySelector("a[data-checkout-pass]"); if (p) window.POVUpgrade && window.POVUpgrade.bindPass(p);
+  const m = msg.querySelector("a[data-checkout]"); if (m) window.POVUpgrade && window.POVUpgrade.bind(m);
 };
 document.addEventListener("click", (e) => { // in-message links to /pricing (no checkout yet): count them as the upsell step
   const a = e.target.closest && e.target.closest("a[data-limit]:not([data-checkout])");
@@ -113,7 +115,7 @@ async function checkLicence() {
 // Pass expired (CEO #7117): same dead-end-avoidance as the in-app/post-export cards — show both
 // upgrade paths (membership + a fresh pass) instead of a plain error with no next step.
 function showPassExpired() {
-  setPro(false, null, `Your 30-day pass ended. <a class="btn primary inline" data-checkout data-limit="pass_expired" data-variant="pass_expired" href="../pricing.html" style="margin:4px 4px 0 0">Go Pro · $9/mo</a> <a class="btn sec inline" data-checkout-pass data-limit="pass_expired" data-variant="pass_expired" href="../pricing.html" style="font-size:12px;padding:6px 10px" hidden>or $9 once — 30 days, no subscription</a>`);
+  setPro(false, null, `Your 30-day pass ended. <a class="btn primary inline" data-checkout-pass data-limit="pass_expired" data-variant="pass_expired" data-label="Get another pass: $9 once · 30 days" href="../pricing.html" style="margin:4px 4px 0 0" hidden>Get another pass: $9 once · 30 days</a> <a class="btn sec inline" data-checkout data-limit="pass_expired" data-variant="pass_expired" data-label="or $9/month membership" href="../pricing.html" style="font-size:12px;padding:6px 10px">or $9/month membership</a>`);
   const km = $("keymsg");
   const a1 = km.querySelector("a[data-checkout]"); if (a1) window.POVUpgrade && window.POVUpgrade.bind(a1);
   const a2 = km.querySelector("a[data-checkout-pass]"); if (a2) window.POVUpgrade && window.POVUpgrade.bindPass(a2);
@@ -130,7 +132,7 @@ function setPro(on, msg, html) {
   updateBar();
   // Header "Go Pro" link is always visible on this page (CEO #7083): count the impression once
   // licence status has settled, so Pro visitors (who shouldn't see it as a pitch) aren't counted.
-  if (!on && !headerViewSeen && checkoutHref()) { headerViewSeen = true; track("upsell_view", { where: "header", page: "make" }); }
+  if (!on && !headerViewSeen && checkoutHref()) { headerViewSeen = true; try { if (!sessionStorage.getItem("povmaker.hdrview")) { sessionStorage.setItem("povmaker.hdrview", "1"); track("upsell_view", { where: "header", page: "make" }); } } catch (e) {} }
 }
 let headerViewSeen = false;
 // Always-visible Pro bar + the preview watermark note (CEO #2941 A). Counts and caps come from the same constants/state the export uses.
@@ -258,12 +260,12 @@ $("export").onclick = async () => {
   msg.className = "msg";
   track("export_start", { template: state.tpl.id, ua: inAppName || "browser" });
   if (inAppName && !canShareFiles()) { showInAppExportBlocked(); return; }
-  if (state.tpl.pro && !state.pro) { blocked("template_locked", msg, 'This template is Pro. <a data-limit="template_locked" href="../pricing.html">See pricing</a> or enter your licence key.'); return; }
+  if (state.tpl.pro && !state.pro) { blocked("template_locked", msg, 'This template is Pro. <a class="btn primary inline" data-checkout-pass data-limit="template_locked" data-variant="template_locked" data-label="Get Pro: $9 once · 30 days" href="../pricing.html" style="margin:4px 4px 4px 0" hidden>Get Pro: $9 once · 30 days</a> <a class="btn sec inline" data-checkout data-limit="template_locked" data-variant="template_locked" data-label="or $9/month membership" href="../pricing.html" style="font-size:12px;padding:6px 10px">or $9/month membership</a> or enter your licence key.'); return; }
   const D = state.tpl.duration(state.params);
   // CEO #4609: free no longer blocks a long template — it exports the first FREE_MAX_S s of the real arc
   // (the value-gap marker above already told the visitor where it cuts off, before they clicked Export).
   const truncated = !state.pro && D > FREE_MAX_S + 1e-6;
-  if (!state.pro && left() === 0) { blocked("daily_cap", msg, `You've used today's ${FREE_PER_DAY} free exports. <a data-limit="daily_cap" href="../pricing.html">Go Pro</a> for unlimited.`); return; }
+  if (!state.pro && left() === 0) { blocked("daily_cap", msg, `You've used today's ${FREE_PER_DAY} free exports. <a class="btn primary inline" data-checkout-pass data-limit="daily_cap" data-variant="daily_cap" data-label="Get Pro: $9 once · 30 days" href="../pricing.html" style="margin:4px 4px 4px 0" hidden>Get Pro: $9 once · 30 days</a> <a class="btn sec inline" data-checkout data-limit="daily_cap" data-variant="daily_cap" data-label="or $9/month membership" href="../pricing.html" style="font-size:12px;padding:6px 10px">or $9/month membership</a> for unlimited.`); return; }
   $("export").disabled = true; prog.hidden = false; prog.value = 0; msg.textContent = "Rendering…";
   let use = state.tpl, par = state.params, fell = false;
   // 3D template: if WebGL/the scene module isn't available (or the context is lost) export the 2D What If Sim with the same words.
@@ -289,10 +291,11 @@ $("export").onclick = async () => {
     let upsellHtml = "";
     if (!state.pro) {
       const nT = TEMPLATES.filter((t) => !t.preview).length;
-      const passLink = (variant) => `<p style="margin:4px 0 0"><a class="btn sec inline" data-checkout-pass data-limit="post_export" data-variant="${variant}" href="../pricing.html" style="font-size:12px;padding:6px 10px" hidden>or $9 once — 30 days, no subscription</a></p>`;
+      const passLink = (variant, label) => `<p style="margin:0"><a class="btn primary inline" data-checkout-pass data-limit="post_export" data-variant="${variant}" data-label="${label}" href="../pricing.html" hidden>${label}</a></p>`;
+      const monthlyLink = (variant) => `<p style="margin:4px 0 0"><a class="btn sec inline" data-checkout data-limit="post_export" data-variant="${variant}" data-label="or $9/month membership" href="../pricing.html" style="font-size:12px;padding:6px 10px">or $9/month membership</a></p>`;
       upsellHtml = truncated
-        ? `<div class="box upsell" style="margin-bottom:12px"><b>Your clip stops at ${FREE_MAX_S} s. Want the ending?</b><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="post_export" data-variant="payoff1" data-label="Get the full video · ${(window.SITE_CONFIG || {}).priceLabel || "$9/mo"}" href="../pricing.html">Get the full video</a></p>${passLink("payoff1")}<p class="muted" style="margin:6px 0 0">Pro: up to ${PRO_MAX_S} s · no watermark · 60 fps · cancel anytime · 14-day refund</p></div>`
-        : `<div class="box upsell" style="margin-bottom:12px"><b>Want this without the watermark?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports · ${nT} templates</p><p style="margin:0"><a class="btn primary inline" data-checkout data-limit="post_export" data-variant="watermark1" href="../pricing.html">Go Pro</a> <span class="muted">14-day refund, cancel any time</span></p>${passLink("watermark1")}</div>`;
+        ? `<div class="box upsell" style="margin-bottom:12px"><b>Your clip stops at ${FREE_MAX_S} s. Want the ending?</b>${passLink("payoff1", "Get Pro: $9 once · 30 days")}${monthlyLink("payoff1")}<p class="muted" style="margin:6px 0 0">Pro: up to ${PRO_MAX_S} s · no watermark · 60 fps · cancel anytime · 14-day refund</p></div>`
+        : `<div class="box upsell" style="margin-bottom:12px"><b>Want this without the watermark?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports · ${nT} templates</p>${passLink("watermark1", "Get Pro: $9 once · 30 days")}${monthlyLink("watermark1")}<p class="muted" style="margin:6px 0 0">14-day refund, cancel any time</p></div>`;
     }
     $("out").innerHTML = upsellHtml + `<video src="${url}" controls loop playsinline></video><p>` +
       (canShareFile ? `<button id="sharebtn" class="btn primary" type="button">Save / share video</button>` : `<a class="btn primary" download="${filename}" href="${url}">Download MP4</a>`) +
