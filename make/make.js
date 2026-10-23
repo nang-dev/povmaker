@@ -65,9 +65,26 @@ function showInAppExportBlocked() {
   const proCard = href
     ? `<div class="box upsell" style="margin:10px 0"><b>Want this without the watermark later?</b><p class="muted" style="margin:6px 0">Pro: no watermark or end card · up to ${PRO_MAX_S} s · 60 fps · unlimited exports</p><p style="margin:0"><a class="btn sec inline" data-checkout-pass data-limit="inapp" data-variant="inapp1" href="../pricing.html" hidden>Get Pro: $9 once · 30 days</a></p><p style="margin:4px 0 0"><a class="btn sec inline" data-checkout data-limit="inapp" data-variant="inapp1" data-label="or $9/month membership" href="../pricing.html" style="font-size:12px;padding:6px 10px">or $9/month membership</a></p></div>`
     : "";
-  msg.innerHTML = `<b>This app's browser can't save videos. Open in Safari to export →</b><br>` +
+  // One-tap escape: Android can jump straight into Chrome via an intent:// link; iOS has no
+  // equivalent in-app → Safari deep link that always works, so x-safari-https:// is a best-effort
+  // (older/odd webviews may ignore it) — Copy link stays as the guaranteed fallback either way.
+  const os = /android/i.test(UA) ? "android" : /iphone|ipad|ipod/i.test(UA) ? "ios" : "";
+  const escapeHref = () => {
+    const url = projectUrl();
+    if (os === "android") return `intent://${url.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`;
+    if (os === "ios") return `x-safari-https://${url.replace(/^https?:\/\//, "")}`;
+    return "";
+  };
+  const escapeBtn = os
+    ? `<a id="escapebtn" class="btn primary" style="margin-top:8px;display:inline-block" href="#">Open in ${os === "android" ? "Chrome" : "Safari"} →</a><br>`
+    : "";
+  msg.innerHTML = `<b>This app's browser can't save videos. Open in ${os === "android" ? "Chrome" : "Safari"} to export →</b><br>` +
+    escapeBtn +
     `<button id="copylinkbtn" class="btn primary" type="button" style="margin-top:8px">Copy link</button><br>` +
     `<span class="muted">Tap ••• (or the menu icon) → Open in browser</span>` + proCard;
+  const escBtn = $("escapebtn");
+  // href is set at click time (not render time) so it carries whatever the visitor has edited since this banner rendered.
+  if (escBtn) escBtn.onclick = (e) => { e.preventDefault(); track("inapp_escape_click", { os }); location.href = escapeHref(); };
   const linkBtn = $("copylinkbtn");
   // projectUrl() is read at click time, not here: this banner renders once on load, well before
   // the visitor has edited any field, so the URL has to be built fresh with whatever they've typed so far.
@@ -350,4 +367,6 @@ buildTemplates(); buildFields(); checkLicence();
 if (state.tpl.id === "whatif-3d") ensure3D();
 requestAnimationFrame(tick);
 track("visit_make", { template: state.tpl.id, demo: state.demo ? demoSlug : "", source: (JSON.parse(localStorage.getItem("utm") || "{}").utm_source) || "direct" });
-if (inAppName) { track("inapp", { app: inAppName }); if (!canShareFiles()) showInAppExportBlocked(); }
+// CEO #7480: don't show the in-app-blocked wall on load — let them pick a template, edit and
+// preview first. The wall only appears when they tap Export (see the export.onclick handler below).
+if (inAppName) track("inapp", { app: inAppName });

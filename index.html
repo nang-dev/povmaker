@@ -25,7 +25,9 @@
 (function(){var q=new URLSearchParams(location.search),b=(q.get("brand")||q.get("utm_campaign")||"").toLowerCase();
 document.documentElement.dataset.brand=/sidechar/.test(b)?"sidecharpov":"ranthesim";
 // CEO #7107: RTS YouTube viewers land straight on the speed-sim template, not the generic bio page.
-if (q.get("utm_source")==="youtube" && q.get("utm_campaign")==="ranthesim") location.replace("sim/"+location.search);
+// CEO #7480: IG traffic (utm_source=instagram) shares the ranthesim campaign but previously missed
+// this redirect (youtube-only) and landed on the generic home page instead of the editable sim demo.
+if (["youtube","instagram"].includes(q.get("utm_source")) && q.get("utm_campaign")==="ranthesim") location.replace("sim/"+location.search);
 })();
 </script>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
